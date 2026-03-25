@@ -20,7 +20,7 @@ export function registerDeployTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const config = resolveConfig(params);
+        const config = await resolveConfig(params);
         const deployOptions: Record<string, unknown> = {
           host: config.host,
           password: config.password,
@@ -56,7 +56,7 @@ export function registerDeployTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const config = resolveConfig(params);
+        const config = await resolveConfig(params);
         await rokuDeploy.deleteInstalledChannel({
           host: config.host,
           password: config.password,

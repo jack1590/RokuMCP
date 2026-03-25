@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.0] - 2026-03-25
+
+### Added
+- SSDP-based auto-discovery of Roku devices on the local network. When no host is configured, the server automatically finds and uses the first available device.
+- New `roku_discover` tool to scan the network and list all Roku devices with their IPs.
+
 ## [1.1.1] - 2026-03-25
 
 ### Improved

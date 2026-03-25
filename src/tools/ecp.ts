@@ -3,6 +3,7 @@ import { z } from 'zod';
 import axios from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { resolveHost } from '../roku-config.js';
+import { discoverRokuDevices } from '../discovery.js';
 
 const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
 
@@ -11,6 +12,36 @@ function ecpUrl(host: string, path: string): string {
 }
 
 export function registerEcpTools(server: McpServer): void {
+  server.registerTool(
+    'roku_discover',
+    {
+      description: 'Scan the local network for Roku devices using SSDP discovery. Returns a list of all found devices with their IP addresses.',
+      inputSchema: {
+        timeoutMs: z.number().optional().default(3000).describe('How long to scan in milliseconds (default 3000)'),
+      },
+    },
+    async (params) => {
+      try {
+        const devices = await discoverRokuDevices(params.timeoutMs ?? 3000);
+        if (devices.length === 0) {
+          return {
+            content: [{ type: 'text', text: 'No Roku devices found on the network.' }],
+          };
+        }
+        const list = devices.map((d, i) => `${i + 1}. ${d.host} (${d.location})`).join('\n');
+        return {
+          content: [{ type: 'text', text: `Found ${devices.length} Roku device(s):\n${list}` }],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          content: [{ type: 'text', text: `Discovery failed: ${message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
   server.registerTool(
     'roku_keypress',
     {
@@ -22,7 +53,7 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const host = resolveHost(params);
+        const host = await resolveHost(params);
         await axios.post(ecpUrl(host, `keypress/${encodeURIComponent(params.key)}`));
         return {
           content: [{ type: 'text', text: `Key press sent: ${params.key}` }],
@@ -53,7 +84,7 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const host = resolveHost(params);
+        const host = await resolveHost(params);
         const delay = params.delayMs ?? 100;
         for (const key of params.keys) {
           await axios.post(ecpUrl(host, `keypress/${encodeURIComponent(key)}`));
@@ -89,7 +120,7 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (toolParams) => {
       try {
-        const host = resolveHost(toolParams);
+        const host = await resolveHost(toolParams);
         const queryString = toolParams.params
           ? '?' + new URLSearchParams(toolParams.params as Record<string, string>).toString()
           : '';
@@ -117,7 +148,7 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const host = resolveHost(params);
+        const host = await resolveHost(params);
         const response = await axios.get(ecpUrl(host, 'query/device-info'));
         const parsed = xmlParser.parse(response.data);
         return {
@@ -143,7 +174,7 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const host = resolveHost(params);
+        const host = await resolveHost(params);
         const response = await axios.get(ecpUrl(host, 'query/active-app'));
         const parsed = xmlParser.parse(response.data);
         return {
@@ -169,7 +200,7 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const host = resolveHost(params);
+        const host = await resolveHost(params);
         const response = await axios.get(ecpUrl(host, 'query/app-ui'));
         return {
           content: [{ type: 'text', text: response.data }],
@@ -196,7 +227,7 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const host = resolveHost(params);
+        const host = await resolveHost(params);
         let path: string;
 
         if (params.type === 'node') {

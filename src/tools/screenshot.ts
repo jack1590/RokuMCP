@@ -19,7 +19,7 @@ export function registerScreenshotTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const config = resolveConfig(params);
+        const config = await resolveConfig(params);
         const options: Record<string, unknown> = {
           host: config.host,
           password: config.password,

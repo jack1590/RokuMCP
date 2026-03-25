@@ -44,6 +44,10 @@ Replace `ROKU_DEVICE_HOST` with your Roku device's IP address and `ROKU_DEVICE_P
 
 Both can also be passed as parameters on each tool call, which override the environment variables.
 
+### Auto-discovery
+
+If `ROKU_DEVICE_HOST` is not set and no `host` parameter is provided, the server automatically discovers Roku devices on the local network using SSDP and uses the first one found. You can also use the `roku_discover` tool to list all available devices. Note that the password cannot be discovered and must still be configured.
+
 ### `.env` file support
 
 The server automatically loads a `.env` file from the current working directory using [dotenv](https://www.npmjs.com/package/dotenv). If your project's `.env` already uses `ROKU_DEVICE_HOST` and `ROKU_DEVICE_PASSWORD`, the server picks them up with no extra configuration:
@@ -96,6 +100,12 @@ ROKU_DEVICE_PASSWORD=my-password
 |---|---|
 | `roku_deploy` | Sideload (deploy) a Roku app to the device |
 | `roku_delete_dev_channel` | Delete the currently sideloaded developer channel |
+
+### Discovery
+
+| Tool | Description |
+|---|---|
+| `roku_discover` | Scan the local network for Roku devices via SSDP |
 
 ### ECP (External Control Protocol)
 

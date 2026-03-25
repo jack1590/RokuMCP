@@ -30,7 +30,7 @@ export function registerConsoleTools(server: McpServer): void {
           };
         }
 
-        const host = resolveHost(params);
+        const host = await resolveHost(params);
         const port = params.port ?? 8085;
 
         return await new Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }>((resolve) => {
