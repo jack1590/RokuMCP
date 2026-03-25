@@ -10,7 +10,7 @@ import { registerConsoleTools } from './tools/console.js';
 
 const server = new McpServer({
   name: 'roku-mcp',
-  version: '1.2.1',
+  version: '1.2.2',
 });
 
 registerDeployTools(server);

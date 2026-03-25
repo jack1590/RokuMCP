@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.2] - 2026-03-25
+
+### Improved
+- Console tools (`roku_console_read`, `roku_console_send`) now auto-disconnect after returning output, preventing stale TCP connections.
+- Deploy tool includes all project files by default (`**/*`) instead of only `source/` and `components/`, and validates the manifest before deploying.
+- Deploy staging isolated to temp directory to prevent interference with source files.
+- Multi-client setup docs: Cursor, VS Code, Claude Desktop, Windsurf, and generic MCP clients.
+
 ## [1.2.1] - 2026-03-25
 
 ### Improved
