@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.0] - 2026-03-25
+
+### Added
+- `roku_type_text` — Type a text string into the focused field (each character sent as a Lit_ keypress). Ideal for search, login, and form-filling flows.
+- `roku_query_media_player` — Query media player state (play, pause, buffer, stop), position, duration, and error info. Essential for video playback testing.
+- `roku_find_node` — Search the app UI tree for a node by ID or attribute (subtype, text, name, etc.) and return its properties.
+- `roku_get_focused_node` — Get the currently focused node with all its properties (id, subtype, text, bounds).
+- `roku_sleep` — Wait for a specified duration between test steps (capped at 30 seconds).
+
 ## [1.2.2] - 2026-03-25
 
 ### Improved

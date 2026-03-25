@@ -171,11 +171,16 @@ Or simply add the two expected variables to your `.env` alongside your existing 
 |---|---|
 | `roku_keypress` | Send a single key press (Home, Select, Up, Down, Left, Right, Back, etc.) |
 | `roku_keypress_sequence` | Send multiple key presses in sequence with configurable delay |
+| `roku_type_text` | Type a text string into the focused field (e.g. email, password, search) |
 | `roku_launch` | Launch or deep-link into a channel |
 | `roku_query_device_info` | Get device model, firmware, serial number, network info |
 | `roku_query_active_app` | Get the currently running app |
+| `roku_query_media_player` | Get media player state (play/pause/buffer/stop), position, and duration |
 | `roku_query_app_ui` | Get the current app UI tree as XML |
 | `roku_query_sg_nodes` | Query SceneGraph nodes (all, roots, or by node ID) |
+| `roku_find_node` | Search the UI tree for a node by ID or attribute (subtype, text, etc.) |
+| `roku_get_focused_node` | Get the currently focused node with all its properties |
+| `roku_sleep` | Wait for a specified duration (useful between navigation steps) |
 
 ### Screenshot
 
@@ -188,9 +193,9 @@ Or simply add the two expected variables to your `.env` alongside your existing 
 | Tool | Description |
 |---|---|
 | `roku_console_connect` | Open a TCP connection to the BrightScript debug console (port 8085) |
-| `roku_console_read` | Read buffered console output since last read |
-| `roku_console_send` | Send a command to the debug console (bt, var, cont, step, etc.) |
-| `roku_console_disconnect` | Close the console connection |
+| `roku_console_read` | Read buffered console output and auto-disconnect |
+| `roku_console_send` | Send a command to the debug console and auto-disconnect |
+| `roku_console_disconnect` | Close the console connection (safety net) |
 
 ## Requirements
 

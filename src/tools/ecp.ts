@@ -247,4 +247,220 @@ export function registerEcpTools(server: McpServer): void {
       }
     }
   );
+
+  server.registerTool(
+    'roku_type_text',
+    {
+      description: 'Type a text string into the currently focused text field on the Roku device. Each character is sent as an individual Lit_ keypress. Use this for search fields, email inputs, password fields, etc.',
+      inputSchema: {
+        host: z.string().optional().describe('IP address or hostname of the Roku device'),
+        text: z.string().describe('The text string to type'),
+        delayMs: z
+          .number()
+          .optional()
+          .default(50)
+          .describe('Delay in milliseconds between each character (default 50)'),
+      },
+    },
+    async (params) => {
+      try {
+        const host = await resolveHost(params);
+        const delay = params.delayMs ?? 50;
+        for (const char of params.text) {
+          await axios.post(ecpUrl(host, `keypress/${encodeURIComponent('Lit_' + char)}`));
+          if (delay > 0) {
+            await new Promise((r) => setTimeout(r, delay));
+          }
+        }
+        return {
+          content: [{ type: 'text', text: `Typed ${params.text.length} characters: "${params.text}"` }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: 'text', text: `Type text failed: ${friendlyError(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'roku_query_media_player',
+    {
+      description: 'Query the media player state on the Roku device. Returns playback state (play, pause, buffer, stop, none), position, duration, and error info. Use this to verify video playback in tests.',
+      inputSchema: {
+        host: z.string().optional().describe('IP address or hostname of the Roku device'),
+      },
+    },
+    async (params) => {
+      try {
+        const host = await resolveHost(params);
+        const response = await axios.get(ecpUrl(host, 'query/media-player'));
+        const parsed = xmlParser.parse(response.data);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(parsed, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: 'text', text: `Query media player failed: ${friendlyError(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'roku_find_node',
+    {
+      description: 'Search the app UI tree for a node by its ID or attribute value. Returns the matching node with all its properties (text, visible, focused, subtype, bounds, etc.). Only works when a sideloaded dev channel is running.',
+      inputSchema: {
+        host: z.string().optional().describe('IP address or hostname of the Roku device'),
+        nodeId: z.string().optional().describe('The ID of the node to find (e.g. "emailBox", "settingsTabs")'),
+        attr: z.string().optional().describe('Attribute name to search by (e.g. "subtype", "text", "name")'),
+        value: z.string().optional().describe('Attribute value to match (e.g. "AccountSettingsScreen")'),
+      },
+    },
+    async (params) => {
+      try {
+        if (!params.nodeId && (!params.attr || !params.value)) {
+          return {
+            content: [{ type: 'text', text: 'Provide either nodeId, or both attr and value to search for a node.' }],
+            isError: true,
+          };
+        }
+        const host = await resolveHost(params);
+        const response = await axios.get(ecpUrl(host, 'query/app-ui'));
+        const parsed = xmlParser.parse(response.data);
+
+        const results: Record<string, unknown>[] = [];
+
+        function searchNode(node: unknown): void {
+          if (!node || typeof node !== 'object') return;
+          const n = node as Record<string, unknown>;
+
+          let match = false;
+          if (params.nodeId) {
+            match = n['@_id'] === params.nodeId || n['@_name'] === params.nodeId;
+          } else if (params.attr && params.value) {
+            const attrKey = params.attr.startsWith('@_') ? params.attr : `@_${params.attr}`;
+            match = String(n[attrKey] ?? '') === params.value;
+          }
+
+          if (match) {
+            const attrs: Record<string, unknown> = {};
+            for (const [k, v] of Object.entries(n)) {
+              if (k.startsWith('@_')) {
+                attrs[k.slice(2)] = v;
+              }
+            }
+            results.push(attrs);
+          }
+
+          for (const v of Object.values(n)) {
+            if (Array.isArray(v)) {
+              v.forEach(searchNode);
+            } else if (typeof v === 'object' && v !== null) {
+              searchNode(v);
+            }
+          }
+        }
+
+        searchNode(parsed);
+
+        if (results.length === 0) {
+          const searchDesc = params.nodeId ? `id="${params.nodeId}"` : `${params.attr}="${params.value}"`;
+          return {
+            content: [{ type: 'text', text: `No node found with ${searchDesc} in the current UI tree.` }],
+          };
+        }
+
+        return {
+          content: [{ type: 'text', text: JSON.stringify(results.length === 1 ? results[0] : results, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: 'text', text: `Find node failed: ${friendlyError(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'roku_get_focused_node',
+    {
+      description: 'Get the currently focused node in the app UI tree. Returns the node with all its properties (id, subtype, text, bounds, etc.). Only works when a sideloaded dev channel is running.',
+      inputSchema: {
+        host: z.string().optional().describe('IP address or hostname of the Roku device'),
+      },
+    },
+    async (params) => {
+      try {
+        const host = await resolveHost(params);
+        const response = await axios.get(ecpUrl(host, 'query/app-ui'));
+        const parsed = xmlParser.parse(response.data);
+
+        let focused: Record<string, unknown> | null = null;
+
+        function findFocused(node: unknown): void {
+          if (focused || !node || typeof node !== 'object') return;
+          const n = node as Record<string, unknown>;
+
+          if (n['@_focused'] === 'true' || n['@_focused'] === true) {
+            const attrs: Record<string, unknown> = {};
+            for (const [k, v] of Object.entries(n)) {
+              if (k.startsWith('@_')) {
+                attrs[k.slice(2)] = v;
+              }
+            }
+            focused = attrs;
+            return;
+          }
+
+          for (const v of Object.values(n)) {
+            if (focused) return;
+            if (Array.isArray(v)) {
+              v.forEach(findFocused);
+            } else if (typeof v === 'object' && v !== null) {
+              findFocused(v);
+            }
+          }
+        }
+
+        findFocused(parsed);
+
+        if (!focused) {
+          return {
+            content: [{ type: 'text', text: 'No focused node found in the current UI tree.' }],
+          };
+        }
+
+        return {
+          content: [{ type: 'text', text: JSON.stringify(focused, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: 'text', text: `Get focused node failed: ${friendlyError(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'roku_sleep',
+    {
+      description: 'Wait for a specified duration. Use this between navigation steps to allow the UI to render, animations to complete, or content to load.',
+      inputSchema: {
+        durationMs: z.number().describe('Duration to wait in milliseconds (e.g. 1000 for 1 second, 5000 for 5 seconds)'),
+      },
+    },
+    async (params) => {
+      const ms = Math.min(Math.max(params.durationMs, 0), 30_000);
+      await new Promise((r) => setTimeout(r, ms));
+      return {
+        content: [{ type: 'text', text: `Waited ${ms}ms` }],
+      };
+    }
+  );
 }
