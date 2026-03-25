@@ -1,6 +1,6 @@
 {
   "name": "roku-mcp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "MCP server for Roku device automation — deploy, ECP control, screenshots, and debug console",
   "type": "module",
   "main": "dist/index.js",
@@ -39,6 +39,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.28.0",
     "axios": "^1.13.6",
+    "dotenv": "^17.3.1",
     "fast-xml-parser": "^5.5.9",
     "roku-deploy": "^3.16.3",
     "zod": "^4.3.6"

@@ -44,6 +44,28 @@ Replace `ROKU_DEVICE_HOST` with your Roku device's IP address and `ROKU_DEVICE_P
 
 Both can also be passed as parameters on each tool call, which override the environment variables.
 
+### `.env` file support
+
+The server automatically loads a `.env` file from the current working directory using [dotenv](https://www.npmjs.com/package/dotenv). If your Roku project already has a `.env` with the device host and password, the MCP server will pick them up with no extra configuration:
+
+```
+ROKU_DEVICE_HOST=192.168.1.100
+ROKU_DEVICE_PASSWORD=my-password
+```
+
+This means you can use a minimal `.cursor/mcp.json` with no `env` block:
+
+```json
+{
+  "mcpServers": {
+    "roku": {
+      "command": "npx",
+      "args": ["-y", "roku-mcp"]
+    }
+  }
+}
+```
+
 ## Available Tools
 
 ### Deploy
