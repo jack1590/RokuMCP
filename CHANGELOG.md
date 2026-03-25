@@ -1,0 +1,18 @@
+# Changelog
+
+## [1.1.0] - 2026-03-25
+
+### Added
+- Automatic `.env` file loading via `dotenv`. The server now reads environment variables from the working directory's `.env` file, so Roku projects with existing `.env` files work out of the box.
+
+## [1.0.0] - 2026-03-25
+
+### Added
+- Initial release.
+- **Deploy tools**: `roku_deploy`, `roku_delete_dev_channel` (via `roku-deploy`).
+- **ECP tools**: `roku_keypress`, `roku_keypress_sequence`, `roku_launch`, `roku_query_device_info`, `roku_query_active_app`, `roku_query_app_ui`, `roku_query_sg_nodes`.
+- **Screenshot tool**: `roku_screenshot` (returns base64 image and file path).
+- **Debug console tools**: `roku_console_connect`, `roku_console_read`, `roku_console_send`, `roku_console_disconnect` (TCP socket on port 8085).
+- Environment variable configuration (`ROKU_DEVICE_HOST`, `ROKU_DEVICE_PASSWORD`).
+- Per-tool parameter overrides for host and password.
+- stdio transport for Cursor/IDE integration.
