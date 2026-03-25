@@ -7,10 +7,33 @@
   "bin": {
     "roku-mcp": "dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jack1590/RokuMCP.git"
+  },
+  "homepage": "https://github.com/jack1590/RokuMCP#readme",
+  "bugs": {
+    "url": "https://github.com/jack1590/RokuMCP/issues"
+  },
+  "keywords": [
+    "mcp",
+    "roku",
+    "brightscript",
+    "ecp",
+    "automation",
+    "modelcontextprotocol",
+    "scenegraph"
+  ],
+  "author": "jack1590",
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "prepare": "npm run build"
   },
   "license": "MIT",
   "dependencies": {
