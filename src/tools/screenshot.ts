@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { rokuDeploy } from 'roku-deploy';
 import fs from 'fs/promises';
 import path from 'path';
-import { resolveConfig } from '../roku-config.js';
+import { resolveConfig, friendlyError } from '../roku-config.js';
 
 export function registerScreenshotTools(server: McpServer): void {
   server.registerTool(
@@ -52,9 +52,8 @@ export function registerScreenshotTools(server: McpServer): void {
           ],
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
         return {
-          content: [{ type: 'text', text: `Screenshot failed: ${message}` }],
+          content: [{ type: 'text', text: `Screenshot failed: ${friendlyError(error)}` }],
           isError: true,
         };
       }

@@ -8,15 +8,17 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server for Ro
 npm install -g roku-mcp
 ```
 
-Or run directly with npx:
+Or run directly with npx (no install required):
 
 ```bash
 npx roku-mcp
 ```
 
-## Cursor Configuration
+## Client Configuration
 
-Add the following to your project's `.cursor/mcp.json`:
+### Cursor
+
+1. Create `.cursor/mcp.json` in your project root:
 
 ```json
 {
@@ -33,7 +35,87 @@ Add the following to your project's `.cursor/mcp.json`:
 }
 ```
 
-Replace `ROKU_DEVICE_HOST` with your Roku device's IP address and `ROKU_DEVICE_PASSWORD` with the developer password you set during dev mode setup.
+2. Reload the window: `Cmd+Shift+P` (macOS) / `Ctrl+Shift+P` (Windows/Linux) → **Developer: Reload Window**
+3. Go to **Cursor Settings → MCP** and verify the "roku" server shows a green status. If it appears disabled, click the toggle to enable it.
+
+### VS Code
+
+Requires VS Code **1.99+** with the GitHub Copilot extension.
+
+1. Create `.vscode/mcp.json` in your project root:
+
+```json
+{
+  "servers": {
+    "roku": {
+      "command": "npx",
+      "args": ["-y", "roku-mcp"],
+      "env": {
+        "ROKU_DEVICE_HOST": "192.168.1.XXX",
+        "ROKU_DEVICE_PASSWORD": "your-password"
+      }
+    }
+  }
+}
+```
+
+2. Reload the window: `Cmd+Shift+P` / `Ctrl+Shift+P` → **Developer: Reload Window**
+3. Open Copilot Chat and switch to **Agent mode** (select from the chat mode dropdown). The roku tools will be available there.
+
+### Claude Desktop
+
+Add to your Claude Desktop config file:
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "roku": {
+      "command": "npx",
+      "args": ["-y", "roku-mcp"],
+      "env": {
+        "ROKU_DEVICE_HOST": "192.168.1.XXX",
+        "ROKU_DEVICE_PASSWORD": "your-password"
+      }
+    }
+  }
+}
+```
+
+Restart Claude Desktop after saving.
+
+### Windsurf
+
+Create `.windsurf/mcp.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "roku": {
+      "command": "npx",
+      "args": ["-y", "roku-mcp"],
+      "env": {
+        "ROKU_DEVICE_HOST": "192.168.1.XXX",
+        "ROKU_DEVICE_PASSWORD": "your-password"
+      }
+    }
+  }
+}
+```
+
+Reload the window after saving.
+
+### Any MCP-compatible client
+
+The server uses **stdio transport**. Any client that supports MCP can launch it with:
+
+```
+command: npx
+args:    ["-y", "roku-mcp"]
+```
+
+Pass `ROKU_DEVICE_HOST` and `ROKU_DEVICE_PASSWORD` as environment variables, or omit the host to use SSDP auto-discovery.
 
 ## Environment Variables
 
@@ -50,47 +132,23 @@ If `ROKU_DEVICE_HOST` is not set and no `host` parameter is provided, the server
 
 ### `.env` file support
 
-The server automatically loads a `.env` file from the current working directory using [dotenv](https://www.npmjs.com/package/dotenv). If your project's `.env` already uses `ROKU_DEVICE_HOST` and `ROKU_DEVICE_PASSWORD`, the server picks them up with no extra configuration:
+The server automatically loads a `.env` file from the current working directory using [dotenv](https://www.npmjs.com/package/dotenv). If your project's `.env` already uses `ROKU_DEVICE_HOST` and `ROKU_DEVICE_PASSWORD`, the server picks them up with no extra configuration — just omit the `env` block from your MCP config:
 
 ```
 ROKU_DEVICE_HOST=192.168.1.100
 ROKU_DEVICE_PASSWORD=my-password
-```
-
-```json
-{
-  "mcpServers": {
-    "roku": {
-      "command": "npx",
-      "args": ["-y", "roku-mcp"]
-    }
-  }
-}
 ```
 
 If your project uses different variable names (e.g. `ROKU_IP`, `ROKU_DEV_PASSWORD`), you can map them in the `env` block:
 
 ```json
-{
-  "mcpServers": {
-    "roku": {
-      "command": "npx",
-      "args": ["-y", "roku-mcp"],
-      "env": {
-        "ROKU_DEVICE_HOST": "${ROKU_IP}",
-        "ROKU_DEVICE_PASSWORD": "${ROKU_DEV_PASSWORD}"
-      }
-    }
-  }
+"env": {
+  "ROKU_DEVICE_HOST": "${ROKU_IP}",
+  "ROKU_DEVICE_PASSWORD": "${ROKU_DEV_PASSWORD}"
 }
 ```
 
-Or simply add the two expected variables to your `.env`:
-
-```
-ROKU_DEVICE_HOST=192.168.1.100
-ROKU_DEVICE_PASSWORD=my-password
-```
+Or simply add the two expected variables to your `.env` alongside your existing ones.
 
 ## Available Tools
 

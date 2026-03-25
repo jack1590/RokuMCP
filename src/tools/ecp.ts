@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import axios from 'axios';
 import { XMLParser } from 'fast-xml-parser';
-import { resolveHost } from '../roku-config.js';
+import { resolveHost, friendlyError } from '../roku-config.js';
 import { discoverRokuDevices } from '../discovery.js';
 
 const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
@@ -33,9 +33,8 @@ export function registerEcpTools(server: McpServer): void {
           content: [{ type: 'text', text: `Found ${devices.length} Roku device(s):\n${list}` }],
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
         return {
-          content: [{ type: 'text', text: `Discovery failed: ${message}` }],
+          content: [{ type: 'text', text: `Discovery failed: ${friendlyError(error)}` }],
           isError: true,
         };
       }
@@ -59,9 +58,8 @@ export function registerEcpTools(server: McpServer): void {
           content: [{ type: 'text', text: `Key press sent: ${params.key}` }],
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
         return {
-          content: [{ type: 'text', text: `Key press failed: ${message}` }],
+          content: [{ type: 'text', text: `Key press failed: ${friendlyError(error)}` }],
           isError: true,
         };
       }
@@ -96,9 +94,8 @@ export function registerEcpTools(server: McpServer): void {
           content: [{ type: 'text', text: `Key sequence sent: ${params.keys.join(', ')}` }],
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
         return {
-          content: [{ type: 'text', text: `Key sequence failed: ${message}` }],
+          content: [{ type: 'text', text: `Key sequence failed: ${friendlyError(error)}` }],
           isError: true,
         };
       }
@@ -129,9 +126,8 @@ export function registerEcpTools(server: McpServer): void {
           content: [{ type: 'text', text: `Launched app ${toolParams.appId} on ${host}` }],
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
         return {
-          content: [{ type: 'text', text: `Launch failed: ${message}` }],
+          content: [{ type: 'text', text: `Launch failed: ${friendlyError(error)}` }],
           isError: true,
         };
       }
@@ -155,9 +151,8 @@ export function registerEcpTools(server: McpServer): void {
           content: [{ type: 'text', text: JSON.stringify(parsed, null, 2) }],
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
         return {
-          content: [{ type: 'text', text: `Query device info failed: ${message}` }],
+          content: [{ type: 'text', text: `Query device info failed: ${friendlyError(error)}` }],
           isError: true,
         };
       }
@@ -181,9 +176,8 @@ export function registerEcpTools(server: McpServer): void {
           content: [{ type: 'text', text: JSON.stringify(parsed, null, 2) }],
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
         return {
-          content: [{ type: 'text', text: `Query active app failed: ${message}` }],
+          content: [{ type: 'text', text: `Query active app failed: ${friendlyError(error)}` }],
           isError: true,
         };
       }
@@ -206,9 +200,8 @@ export function registerEcpTools(server: McpServer): void {
           content: [{ type: 'text', text: response.data }],
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
         return {
-          content: [{ type: 'text', text: `Query app UI failed: ${message}` }],
+          content: [{ type: 'text', text: `Query app UI failed: ${friendlyError(error)}` }],
           isError: true,
         };
       }
@@ -247,9 +240,8 @@ export function registerEcpTools(server: McpServer): void {
           content: [{ type: 'text', text: response.data }],
         };
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
         return {
-          content: [{ type: 'text', text: `Query SG nodes failed: ${message}` }],
+          content: [{ type: 'text', text: `Query SG nodes failed: ${friendlyError(error)}` }],
           isError: true,
         };
       }

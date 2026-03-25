@@ -1,3 +1,5 @@
 node_modules/
 dist/
+out/
 *.js.map
+sampleApp/

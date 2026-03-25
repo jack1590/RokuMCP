@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.1] - 2026-03-25
+
+### Improved
+- User-friendly error messages across all tools. Authentication failures (401), connection refused, timeouts, and missing config now return clear, actionable guidance instead of raw error strings.
+- Centralized error formatting via `friendlyError()` helper so the LLM can better assist users when something goes wrong.
+
 ## [1.2.0] - 2026-03-25
 
 ### Added

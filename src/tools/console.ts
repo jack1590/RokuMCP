@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import net from 'net';
-import { resolveHost } from '../roku-config.js';
+import { resolveHost, friendlyError } from '../roku-config.js';
 
 interface ConsoleSession {
   socket: net.Socket;
@@ -45,7 +45,7 @@ export function registerConsoleTools(server: McpServer): void {
           const timeout = setTimeout(() => {
             socket.destroy();
             resolve({
-              content: [{ type: 'text', text: `Connection to ${host}:${port} timed out after 10 seconds` }],
+              content: [{ type: 'text', text: `Connection to ${host}:${port} timed out — make sure the Roku device is on the same network and has a sideloaded dev channel running.` }],
               isError: true,
             });
           }, 10_000);
@@ -78,16 +78,15 @@ export function registerConsoleTools(server: McpServer): void {
             }
             if (!newSession.connected) {
               resolve({
-                content: [{ type: 'text', text: `Connection failed: ${err.message}` }],
+                content: [{ type: 'text', text: `Console connection failed: ${friendlyError(err)}` }],
                 isError: true,
               });
             }
           });
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
         return {
-          content: [{ type: 'text', text: `Console connect failed: ${message}` }],
+          content: [{ type: 'text', text: `Console connect failed: ${friendlyError(error)}` }],
           isError: true,
         };
       }
@@ -162,9 +161,8 @@ export function registerConsoleTools(server: McpServer): void {
           });
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
         return {
-          content: [{ type: 'text', text: `Console send failed: ${message}` }],
+          content: [{ type: 'text', text: `Console send failed: ${friendlyError(error)}` }],
           isError: true,
         };
       }
