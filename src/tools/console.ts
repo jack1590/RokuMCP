@@ -96,7 +96,7 @@ export function registerConsoleTools(server: McpServer): void {
   server.registerTool(
     'roku_console_read',
     {
-      description: 'Read buffered output from the BrightScript debug console since the last read. Clears the buffer after reading.',
+      description: 'Read buffered output from the BrightScript debug console since the last read. Automatically disconnects after reading.',
     },
     async () => {
       if (!session?.connected) {
@@ -110,15 +110,18 @@ export function registerConsoleTools(server: McpServer): void {
 
       const output = session.buffer;
       session.buffer = '';
+      const host = session.host;
+      session.socket.destroy();
+      session = null;
 
       if (output.length === 0) {
         return {
-          content: [{ type: 'text', text: '(no new output)' }],
+          content: [{ type: 'text', text: `(no new output) — disconnected from ${host}` }],
         };
       }
 
       return {
-        content: [{ type: 'text', text: output }],
+        content: [{ type: 'text', text: output + `\n\n--- disconnected from ${host} ---` }],
       };
     }
   );
@@ -126,7 +129,7 @@ export function registerConsoleTools(server: McpServer): void {
   server.registerTool(
     'roku_console_send',
     {
-      description: 'Send a command to the BrightScript debug console. Common commands: bt (backtrace), var (variables), cont (continue), step, over, out, exit, print <expr>.',
+      description: 'Send a command to the BrightScript debug console and return the response. Automatically disconnects after receiving the response. Common commands: bt (backtrace), var (variables), cont (continue), step, over, out, exit, print <expr>.',
       inputSchema: {
         command: z.string().describe('Command to send to the debug console'),
       },
@@ -144,8 +147,10 @@ export function registerConsoleTools(server: McpServer): void {
           session!.buffer = '';
           session!.socket.write(params.command + '\r\n', (err) => {
             if (err) {
+              const host = session?.host ?? 'unknown';
+              if (session) { session.socket.destroy(); session = null; }
               resolve({
-                content: [{ type: 'text', text: `Failed to send command: ${err.message}` }],
+                content: [{ type: 'text', text: `Failed to send command: ${err.message} — disconnected from ${host}` }],
                 isError: true,
               });
               return;
@@ -154,13 +159,17 @@ export function registerConsoleTools(server: McpServer): void {
             setTimeout(() => {
               const output = session!.buffer;
               session!.buffer = '';
+              const host = session!.host;
+              session!.socket.destroy();
+              session = null;
               resolve({
-                content: [{ type: 'text', text: output || '(command sent, no output received)' }],
+                content: [{ type: 'text', text: (output || '(command sent, no output received)') + `\n\n--- disconnected from ${host} ---` }],
               });
             }, 500);
           });
         });
       } catch (error) {
+        if (session) { session.socket.destroy(); session = null; }
         return {
           content: [{ type: 'text', text: `Console send failed: ${friendlyError(error)}` }],
           isError: true,
