@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.1] - 2026-03-25
+
+### Improved
+- README now documents how to map custom `.env` variable names (e.g. `ROKU_IP`, `ROKU_DEV_PASSWORD`) to the expected `ROKU_DEVICE_HOST` and `ROKU_DEVICE_PASSWORD`.
+
 ## [1.1.0] - 2026-03-25
 
 ### Added
