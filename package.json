@@ -1,0 +1,27 @@
+{
+  "name": "roku-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Roku device automation — deploy, ECP control, screenshots, and debug console",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "roku-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "axios": "^1.13.6",
+    "fast-xml-parser": "^5.5.9",
+    "roku-deploy": "^3.16.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^6.0.2"
+  }
+}
