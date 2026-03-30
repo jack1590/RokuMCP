@@ -27,17 +27,19 @@ const isDirectRun =
   (process.argv[1].endsWith('/index.js') || process.argv[1].endsWith('/roku-mcp'));
 
 if (isDirectRun) {
-  const { StdioServerTransport } = await import('@modelcontextprotocol/sdk/server/stdio.js');
-  const server = new McpServer({
-    name: 'roku-mcp',
-    version: '1.3.2',
-  });
+  (async () => {
+    const { StdioServerTransport } = await import('@modelcontextprotocol/sdk/server/stdio.js');
+    const server = new McpServer({
+      name: 'roku-mcp',
+      version: '1.3.2',
+    });
 
-  registerDeployTools(server);
-  registerEcpTools(server);
-  registerScreenshotTools(server);
-  registerConsoleTools(server);
+    registerDeployTools(server);
+    registerEcpTools(server);
+    registerScreenshotTools(server);
+    registerConsoleTools(server);
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+  })();
 }
