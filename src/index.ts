@@ -10,7 +10,7 @@ import { registerConsoleTools } from './tools/console.js';
 export default function createServer(_options?: { config?: Record<string, string> }) {
   const server = new McpServer({
     name: 'roku-mcp',
-    version: '1.3.2',
+    version: '1.3.3',
   });
 
   registerDeployTools(server);
@@ -31,7 +31,7 @@ if (isDirectRun) {
     const { StdioServerTransport } = await import('@modelcontextprotocol/sdk/server/stdio.js');
     const server = new McpServer({
       name: 'roku-mcp',
-      version: '1.3.2',
+      version: '1.3.3',
     });
 
     registerDeployTools(server);
