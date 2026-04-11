@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0] - 2026-04-10
+
+### Added
+- `analyze_bsprof` — Analyze .bsprof profiler files from Roku devices. Supports memory, cpu, full, and summary modes with filtering/sorting options. Returns structured JSON reports.
+- `compare_bsprof` — Compare two .bsprof profiles to detect memory regressions, improvements, new leaks, resolved leaks, and CPU time deltas.
+- `bsprof_info` — Get header metadata (target name, device, format version, features) from a .bsprof file without full parsing.
+- New dependency: `bsprof-cli` for BrightScript profiler file parsing and analysis.
+
 ## [1.3.0] - 2026-03-25
 
 ### Added

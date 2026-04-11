@@ -1,7 +1,7 @@
 {
   "name": "roku-mcp",
-  "version": "1.3.3",
-  "description": "MCP server for Roku device automation — deploy, ECP control, screenshots, and debug console",
+  "version": "1.4.0",
+  "description": "MCP server for Roku device automation — deploy, ECP control, screenshots, debug console, and BrightScript profiler analysis",
   "type": "module",
   "main": "dist/index.js",
   "module": "src/index.ts",
@@ -41,6 +41,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.28.0",
     "axios": "^1.13.6",
+    "bsprof-cli": "^1.0.0",
     "dotenv": "^17.3.1",
     "fast-xml-parser": "^5.5.9",
     "roku-deploy": "^3.16.3",
