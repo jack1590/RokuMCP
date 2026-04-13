@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.5.1] - 2026-04-13
+
+### Fixed
+- Upgraded `roku-perfetto` to v1.0.1 — fixes trace analysis returning empty results. The TraceProcessor now uses CLI-based queries instead of the broken HTTP RPC protobuf transport.
+
 ## [1.5.0] - 2026-04-13
 
 ### Added
