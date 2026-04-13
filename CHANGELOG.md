@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.5.2] - 2026-04-13
+
+### Fixed
+- Upgraded `roku-perfetto` to v1.0.2 — downloads the actual `trace_processor_shell` binary directly from Google Cloud Storage instead of the Python wrapper script from `get.perfetto.dev`. The Python wrapper required `python3` in PATH, which is unavailable in Cursor and other IDE-hosted MCP server processes, causing all Perfetto analysis to fail.
+
 ## [1.5.1] - 2026-04-13
 
 ### Fixed

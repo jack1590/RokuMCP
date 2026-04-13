@@ -1,6 +1,6 @@
 {
   "name": "roku-mcp",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "MCP server for Roku device automation — deploy, ECP control, screenshots, debug console, and BrightScript profiler analysis",
   "type": "module",
   "main": "dist/index.js",
@@ -45,7 +45,7 @@
     "dotenv": "^17.3.1",
     "fast-xml-parser": "^5.5.9",
     "roku-deploy": "^3.16.3",
-    "roku-perfetto": "^1.0.0",
+    "roku-perfetto": "^1.0.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {
