@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.5.0] - 2026-04-13
+
+### Added
+- `roku_perfetto_enable` — Enable Perfetto tracing for a Roku channel via ECP. Requires Roku OS 15.1+.
+- `roku_perfetto_start` — Start recording a Perfetto trace via WebSocket binary stream to a local file.
+- `roku_perfetto_stop` — Stop recording and return file path, size, and duration.
+- `analyze_perfetto` — Analyze a Perfetto trace file with AI-friendly suggestions. Modes: summary, frame-drops, key-events, observers, rendezvous, set-fields, threads.
+- `compare_perfetto` — Compare two Perfetto traces to detect performance regressions and improvements.
+- `query_perfetto` — Run raw PerfettoSQL queries against a Perfetto trace file for custom analysis.
+- New dependency: `roku-perfetto` for Roku Perfetto tracing, recording, and analysis.
+
 ## [1.4.0] - 2026-04-10
 
 ### Added
