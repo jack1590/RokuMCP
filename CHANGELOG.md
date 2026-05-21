@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.6.0] - 2026-05-21
+
+### Added
+- `roku_edit_node` — Edit a SceneGraph node on the running dev channel at runtime by setting one or more fields. Uses the [roku-test-automation](https://github.com/triwav/roku-test-automation) (RTA) On-Device Component on TCP port 9000 — the same backend the SceneGraph Inspector in the [vscode-brightscript-language](https://github.com/rokucommunity/vscode-brightscript-language) extension uses.
+- `roku_set_node_visible` — Show or hide a SceneGraph node by id at runtime.
+- `roku_move_node` — Move a SceneGraph node to a new `[x, y]` translation.
+- `roku_focus_node` — Set focus on a SceneGraph node by id via RTA `focusNode`.
+- `roku_remove_node` — Detach a SceneGraph node from its parent at runtime via RTA `removeNode`.
+- `roku_create_node` — Create a new SceneGraph node and append it to a parent via RTA `createChild`.
+- `roku_get_value` — Read a field value (or full keyPath) from the running scene via RTA `getValue`. Recommended for verifying writes.
+- `roku_observe_field` — Block until a SceneGraph field changes or matches a specific value via RTA `onFieldChangeOnce`. Great for "wait until X" assertions in tests.
+- New skill `roku-runtime-ui-editing` with a workflow and the common gotchas (`uiElementId` vs `name`, `LayoutGroup` re-layout overriding writes, etc.).
+
+### Requirements
+- The runtime UI editing tools require the RTA On-Device Component to be present in the running channel. To enable it, either set `"injectRdbOnDeviceComponent": true` in `launch.json` and add the marker comment `' vscode_rdb_on_device_component_entry` immediately after `screen.show()` in `main()`, or bundle the RTA component manually. A successful install logs `[RTA][INFO] OnDeviceComponent init` at channel launch. See the README "Runtime UI Editing" section for details.
+
 ## [1.5.2] - 2026-04-13
 
 ### Fixed

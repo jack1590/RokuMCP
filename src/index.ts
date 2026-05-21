@@ -8,11 +8,12 @@ import { registerScreenshotTools } from './tools/screenshot.js';
 import { registerConsoleTools } from './tools/console.js';
 import { registerBsprofTools } from './tools/bsprof.js';
 import { registerPerfettoTools } from './tools/perfetto.js';
+import { registerEditUiTools } from './tools/edit-ui.js';
 
 export default function createServer(_options?: { config?: Record<string, string> }) {
   const server = new McpServer({
     name: 'roku-mcp',
-    version: '1.5.2',
+    version: '1.6.0',
   });
 
   registerDeployTools(server);
@@ -21,6 +22,7 @@ export default function createServer(_options?: { config?: Record<string, string
   registerConsoleTools(server);
   registerBsprofTools(server);
   registerPerfettoTools(server);
+  registerEditUiTools(server);
 
   return server.server;
 }
@@ -35,7 +37,7 @@ if (isDirectRun) {
     const { StdioServerTransport } = await import('@modelcontextprotocol/sdk/server/stdio.js');
     const server = new McpServer({
       name: 'roku-mcp',
-      version: '1.5.2',
+      version: '1.6.0',
     });
 
     registerDeployTools(server);
@@ -44,6 +46,7 @@ if (isDirectRun) {
     registerConsoleTools(server);
     registerBsprofTools(server);
     registerPerfettoTools(server);
+    registerEditUiTools(server);
 
     const transport = new StdioServerTransport();
     await server.connect(transport);
