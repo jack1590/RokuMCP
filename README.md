@@ -155,6 +155,20 @@ The repo-root [`AGENTS.md`](./AGENTS.md) is picked up automatically by Claude Co
 
 </details>
 
+## Agent rules
+
+For better agent behavior (the `observe → act → wait → verify` loop, the RTA `uiElementId` gotcha that silently breaks `roku_edit_node`, when to use which tool), the repo ships drop-in rules pre-formatted for each major agent. The body is identical — only the wrapper differs to match what each agent auto-loads.
+
+| Agent | File | Install path |
+|---|---|---|
+| Cursor | [`rules/cursor/roku-mcp.mdc`](./rules/cursor/roku-mcp.mdc) | `.cursor/rules/roku-mcp.mdc` |
+| Claude Code | [`rules/claude-code/CLAUDE.md`](./rules/claude-code/CLAUDE.md) | `CLAUDE.md` (repo root) |
+| Claude Desktop | [`rules/claude-desktop/roku-mcp.md`](./rules/claude-desktop/roku-mcp.md) | Settings → System Prompt |
+| Windsurf | [`rules/windsurf/roku-mcp.md`](./rules/windsurf/roku-mcp.md) | `.windsurf/rules/roku-mcp.md` |
+| Codex CLI / OpenCode / Aider | [`AGENTS.md`](./AGENTS.md) (repo root) | `AGENTS.md` (repo root) |
+
+See [`rules/README.md`](./rules/README.md) for one-line copy commands per agent.
+
 ## Quickstart
 
 Once your client is wired up, these three prompts work out of the box and exercise the main capability groups.
