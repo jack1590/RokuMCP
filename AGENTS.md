@@ -4,6 +4,10 @@ Guidance for AI coding agents (Claude Code, OpenCode, Codex, Cursor, VS Code Cop
 
 When `roku_*` (or `analyze_bsprof`, `analyze_perfetto`, `query_perfetto`, `compare_*`) tools are available, follow this guide.
 
+## Server name and tool invocation
+
+Whatever name the user gave this MCP server in their client config (typically `roku`) is the only valid prefix. **Use the tool names exactly as they appear in your tool list** — do not invent prefixes like `user-roku`, `local-roku`, or `roku-mcp`. If a call fails with `MCP server does not exist: <name>`, re-check the actual server name in your available tools and retry; do not guess a different prefix.
+
 ## Tool surface at a glance
 
 | Category | Tools |
