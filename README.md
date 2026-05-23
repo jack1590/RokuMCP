@@ -2,23 +2,23 @@
 
 A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server for Roku device automation. Exposes tools for app deployment, ECP remote control, screenshot capture, SceneGraph node inspection, and BrightScript debug console access.
 
-## Installation
+## Install
+
+The server ships as a single `npx` command. Install once globally if you prefer, or let your MCP client launch it on demand via `npx -y roku-mcp` — both work.
 
 ```bash
-npm install -g roku-mcp
+npm install -g roku-mcp     # optional, global install
+# or just point your client at: npx -y roku-mcp
 ```
 
-Or run directly with npx (no install required):
+Configure your AI client below. Every platform uses the same launch line; only the config file and reload step change.
 
-```bash
-npx roku-mcp
-```
+<details>
+<summary><strong>Cursor</strong> — agent-mode tools, auto-discovers MCP servers</summary>
 
-## Client Configuration
+**Prerequisites:** Cursor 0.45+ with Agent mode.
 
-### Cursor
-
-1. Create `.cursor/mcp.json` in your project root:
+**Install:** create `.cursor/mcp.json` in your project root (or `~/.cursor/mcp.json` for global):
 
 ```json
 {
@@ -35,14 +35,22 @@ npx roku-mcp
 }
 ```
 
-2. Reload the window: `Cmd+Shift+P` (macOS) / `Ctrl+Shift+P` (Windows/Linux) → **Developer: Reload Window**
-3. Go to **Cursor Settings → MCP** and verify the "roku" server shows a green status. If it appears disabled, click the toggle to enable it.
+Then reload the window (`Cmd+Shift+P` / `Ctrl+Shift+P` → **Developer: Reload Window**).
 
-### VS Code
+**Verify:** open **Cursor Settings → MCP** and confirm the `roku` row shows a green dot. If it appears disabled, click the toggle. In a new agent chat, type `list roku tools` — you should see `roku_deploy`, `roku_screenshot`, etc.
 
-Requires VS Code **1.99+** with the GitHub Copilot extension.
+**Routing rule (recommended):** the repo also ships an [`AGENTS.md`](./AGENTS.md). Cursor picks it up automatically, so the agent knows the canonical *observe → act → wait → verify* loop and the RTA `uiElementId` gotcha without you having to re-explain it every session.
 
-1. Create `.vscode/mcp.json` in your project root:
+**Troubleshoot:** if the server stays grey/disabled, check `View → Output → MCP Logs` — the most common cause is `ROKU_DEVICE_HOST` unreachable on the LAN. Omit the `env` block entirely to fall back to SSDP auto-discovery.
+
+</details>
+
+<details>
+<summary><strong>VS Code (GitHub Copilot)</strong> — agent mode, MCP via <code>.vscode/mcp.json</code></summary>
+
+**Prerequisites:** VS Code 1.99+ with the GitHub Copilot extension and an active Copilot subscription that includes Agent mode.
+
+**Install:** create `.vscode/mcp.json` in your project root:
 
 ```json
 {
@@ -59,12 +67,21 @@ Requires VS Code **1.99+** with the GitHub Copilot extension.
 }
 ```
 
-2. Reload the window: `Cmd+Shift+P` / `Ctrl+Shift+P` → **Developer: Reload Window**
-3. Open Copilot Chat and switch to **Agent mode** (select from the chat mode dropdown). The roku tools will be available there.
+Reload the window (`Cmd+Shift+P` / `Ctrl+Shift+P` → **Developer: Reload Window**).
 
-### Claude Desktop
+**Verify:** open Copilot Chat, switch the chat-mode dropdown to **Agent**, and ask "what roku tools do you have?". You should see the full `roku_*` list. The MCP panel (`Cmd+Shift+P` → **MCP: List Servers**) should show `roku` as `Running`.
 
-Add to your Claude Desktop config file:
+**Troubleshoot:** if the server fails to start, run `npx -y roku-mcp --help` in a regular terminal first — that confirms Node 18+ and `npx` are working before VS Code launches it.
+
+</details>
+
+<details>
+<summary><strong>Claude Desktop</strong> — official Anthropic desktop app</summary>
+
+**Prerequisites:** Claude Desktop (latest from claude.ai/download), Node.js 18+ on `PATH`.
+
+**Install:** edit your Claude Desktop config:
+
 - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
@@ -83,11 +100,20 @@ Add to your Claude Desktop config file:
 }
 ```
 
-Restart Claude Desktop after saving.
+Fully quit and restart Claude Desktop (the menu-bar icon must close — `Cmd+Q` on macOS).
 
-### Windsurf
+**Verify:** open a new chat. The 🛠️ icon in the input bar should list `roku-mcp` with all its tools. Ask "take a Roku screenshot" — Claude will request approval for `roku_screenshot` and run it.
 
-Create `.windsurf/mcp.json` in your project root:
+**Troubleshoot:** if no tool icon appears, check `~/Library/Logs/Claude/mcp-server-roku.log` (macOS) — `command not found: npx` means Node isn't on the GUI app's `PATH`. Either install Node via the official `.pkg`, or hard-code the absolute paths: `"command": "/usr/local/bin/node"`, `"args": ["/usr/local/bin/npx", "-y", "roku-mcp"]`.
+
+</details>
+
+<details>
+<summary><strong>Windsurf</strong> — Codeium's agentic IDE</summary>
+
+**Prerequisites:** Windsurf with Cascade enabled.
+
+**Install:** create `.windsurf/mcp.json` in your project root (or `~/.codeium/windsurf/mcp_config.json` globally):
 
 ```json
 {
@@ -104,18 +130,61 @@ Create `.windsurf/mcp.json` in your project root:
 }
 ```
 
-Reload the window after saving.
+Reload the window. In Cascade settings, refresh the MCP server list.
 
-### Any MCP-compatible client
+**Verify:** ask Cascade "list available MCP tools" — `roku_*` entries should appear.
 
-The server uses **stdio transport**. Any client that supports MCP can launch it with:
+**Troubleshoot:** Windsurf occasionally caches a stale server. If reloads don't pick up edits, fully quit Windsurf and reopen.
+
+</details>
+
+<details>
+<summary><strong>Any MCP-compatible client</strong> (Continue, Cline, Zed, Codex, Claude Code, OpenCode, …)</summary>
+
+The server speaks the standard MCP **stdio** transport. Anywhere you can declare:
 
 ```
 command: npx
 args:    ["-y", "roku-mcp"]
+env:     { ROKU_DEVICE_HOST: "...", ROKU_DEVICE_PASSWORD: "..." }
 ```
 
-Pass `ROKU_DEVICE_HOST` and `ROKU_DEVICE_PASSWORD` as environment variables, or omit the host to use SSDP auto-discovery.
+…the server runs. Both env vars are optional: omit `ROKU_DEVICE_HOST` to use SSDP auto-discovery on the LAN, and pass `host` / `password` on each tool call to override.
+
+The repo-root [`AGENTS.md`](./AGENTS.md) is picked up automatically by Claude Code, OpenCode, Codex CLI, and any other tool that follows the AGENTS.md convention, so those agents inherit the same usage guidance without extra setup.
+
+</details>
+
+## Quickstart
+
+Once your client is wired up, these three prompts work out of the box and exercise the main capability groups.
+
+**1. Confirm the device is reachable**
+
+```
+Use roku-mcp to query my Roku device info and tell me the model, firmware, and IP.
+```
+
+The agent should call `roku_query_device_info` (and possibly `roku_discover` if no host is configured) and reply in one turn.
+
+**2. Drive the UI with screenshots**
+
+```
+Press Home, wait 2 seconds, take a screenshot, then move Right twice and
+screenshot again. Describe what changed between the two screenshots.
+```
+
+This exercises `roku_keypress`, `roku_sleep`, and `roku_screenshot` — the standard *observe → act → wait → verify* loop.
+
+**3. Live-edit a running channel (requires RTA — see [Runtime UI Editing](#runtime-ui-editing))**
+
+```
+On the currently running dev channel, find the label that shows the page
+title, change its text to "Hello from MCP", verify the change with
+roku_get_value, then change it back.
+```
+
+The agent will `roku_query_app_ui` to locate the node, grab the `uiElementId`, call `roku_edit_node` + `roku_get_value`, and roll back — proving end-to-end RTA wiring.
 
 ## Environment Variables
 
