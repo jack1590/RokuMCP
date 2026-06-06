@@ -20,6 +20,20 @@ Whatever name the user gave this MCP server in their client config (typically `r
 | Runtime UI editing (RTA, port 9000) | `roku_edit_node`, `roku_set_node_visible`, `roku_move_node`, `roku_focus_node`, `roku_remove_node`, `roku_create_node`, `roku_get_value`, `roku_observe_field` |
 | BrightScript profiler | `analyze_bsprof`, `compare_bsprof`, `bsprof_info` |
 | Perfetto tracing (Roku OS 15.1+) | `roku_perfetto_enable`, `roku_perfetto_start`, `roku_perfetto_stop`, `analyze_perfetto`, `compare_perfetto`, `query_perfetto` |
+| Stream diagnosis | `roku_diagnose_stream` |
+
+## Stream diagnosis (`roku_diagnose_stream`)
+
+Diagnose why an HLS/DASH stream fails **on Roku specifically** by correlating evidence the developer already has — no device needed for the default path. Pass any combination of:
+
+- `errorInfo` — the Video-node error the device reported (`errorCode` -1..-6 and `errorInfo` `category`/`errcode`/`dbgmsg`/`drmerrcode`), as JSON or pasted log text.
+- `url` and/or `content` — the manifest to analyze (fetch a URL, or paste raw m3u8/mpd for token-gated streams). `baseUrl` resolves relative URIs.
+- `charlesSessionPath` — a Charles `.chlsj` (JSON Session File) or `.har` capture on disk. Binary `.chls` is not supported; instruct the user to export `.chlsj`/`.har`.
+- `drm` — the DRM config used (`keySystem`, `licenseServerUrl`, `licenseHeaders`).
+
+The tool cross-references them into ranked findings (`cause`, `evidence[]`, `confidence`, `fix`, `docUrl`). Correlated diagnoses are highest confidence — e.g. `errorCode -6` (DRM) plus a license `POST` returning 403 in the Charles session yields "license server rejected the Roku request". Spec hints come from a dated, cited `roku-specs.json` and are explicitly heuristic.
+
+Optional fallback: when no `errorInfo` is provided and a device is available, set `captureLive: true` (with `host`/`password` and a fetchable `url`) to deploy the bundled StreamProbe harness, play the stream, and capture the real device error before correlating.
 
 ## Connection resolution
 

@@ -27,6 +27,7 @@ Whatever name the user gave this MCP server in their client config (typically `r
 | Runtime UI editing (RTA, port 9000) | `roku_edit_node`, `roku_set_node_visible`, `roku_move_node`, `roku_focus_node`, `roku_remove_node`, `roku_create_node`, `roku_get_value`, `roku_observe_field` |
 | BrightScript profiler | `analyze_bsprof`, `compare_bsprof`, `bsprof_info` |
 | Perfetto tracing (Roku OS 15.1+) | `roku_perfetto_enable`, `roku_perfetto_start`, `roku_perfetto_stop`, `analyze_perfetto`, `compare_perfetto`, `query_perfetto` |
+| Stream diagnosis | `roku_diagnose_stream` |
 
 ## Connection resolution
 

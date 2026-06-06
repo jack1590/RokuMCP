@@ -1,0 +1,94 @@
+{
+  "lastVerified": "2026-06-05",
+  "disclaimer": "Roku stream support varies by OS version, model, and chipset. These tables are conservative, doc-sourced hints, not absolute guarantees. The authoritative answer for any given device is the Video node's own errorInfo after a real playback attempt.",
+  "sources": [
+    "https://developer.roku.com/dev/docs/media",
+    "https://developer.roku.com/dev/docs/content-protection",
+    "https://developer.roku.com/dev/docs/hls-and-dash",
+    "https://developer.roku.com/dev/docs/playing-videos",
+    "https://developer.roku.com/dev/docs/video"
+  ],
+  "video": {
+    "hls": {
+      "supported": ["AVC", "HEVC", "VP9"],
+      "docUrl": "https://developer.roku.com/dev/docs/media"
+    },
+    "dash": {
+      "supported": ["AVC", "HEVC", "VP9", "AV1"],
+      "docUrl": "https://developer.roku.com/dev/docs/media"
+    }
+  },
+  "videoLimits": {
+    "note": "Roku H.264/AVC decoders top out at 1080p (level ~4.2). 4K/UHD requires HEVC, VP9, or AV1 — not H.264. H.264 above level 4.2 or above 1920x1080 is rejected on-device with errorCode -5, even though browsers/VLC decode it in software.",
+    "avc": { "maxWidth": 1920, "maxHeight": 1080, "maxLevel": 42, "profiles": ["Baseline", "Main", "High"] },
+    "hevc": { "maxWidth": 3840, "maxHeight": 2160, "maxLevel": 51 },
+    "docUrl": "https://developer.roku.com/dev/docs/media"
+  },
+  "audio": {
+    "hls": {
+      "supported": ["AAC", "MP3", "DTS", "DD", "DD+"],
+      "docUrl": "https://developer.roku.com/dev/docs/media"
+    },
+    "dash": {
+      "supported": ["AAC", "DTS", "DD", "DD+"],
+      "docUrl": "https://developer.roku.com/dev/docs/media"
+    }
+  },
+  "containers": {
+    "hls": {
+      "supported": ["ts", "fmp4", "cmaf"],
+      "muxedCmafAllowed": false,
+      "muxedTsRequiresVideoAtAllBitrates": true,
+      "docUrl": "https://developer.roku.com/dev/docs/media"
+    },
+    "dash": {
+      "supported": ["fmp4", "cmaf"],
+      "muxedCmafAllowed": false,
+      "docUrl": "https://developer.roku.com/dev/docs/media"
+    }
+  },
+  "drm": {
+    "supportedSystems": {
+      "hls": ["Widevine", "AES-128", "PlayReady", "SAMPLE-AES"],
+      "dash": ["Widevine", "PlayReady"]
+    },
+    "removedSystems": [
+      {
+        "name": "Verimatrix",
+        "removedInOsVersion": "9.3",
+        "note": "Support for Verimatrix DRM was removed from the firmware in Roku OS 9.3. Re-protect content with Widevine or PlayReady.",
+        "docUrl": "https://developer.roku.com/dev/docs/content-protection"
+      }
+    ],
+    "preferredEncryptionScheme": "cbcs",
+    "encryptionNote": "In 2020+ the industry default is a single CMAF packaging encrypted with cbcs, signaled for both HLS and DASH. cenc-only content can play on Roku via Widevine/PlayReady but cannot be shared with FairPlay; cbcs is the safer cross-platform default.",
+    "psshNote": "For best video-start performance on DASH, the manifest should declare the DRM system and include a cenc:pssh box.",
+    "libProviderNote": "A 'BS lib provider not found' error means the DRM library is not installed. Installing a production app that uses that DRM loads the missing library (e.g. install YouTube to load Widevine, Netflix to load PlayReady).",
+    "docUrl": "https://developer.roku.com/dev/docs/content-protection"
+  },
+  "segments": {
+    "vodMaxSeconds": 10,
+    "liveMaxSeconds": 5,
+    "idrAtSegmentStart": true,
+    "alignAcrossVariants": true,
+    "note": "Segments should start with an IDR frame and be aligned across variants/representations. These properties cannot be verified from the manifest alone.",
+    "docUrl": "https://developer.roku.com/dev/docs/media"
+  },
+  "errorCodes": {
+    "0": "no error",
+    "-1": "network error (server down/unreachable, or a client network setup problem)",
+    "-2": "connection timed out",
+    "-3": "unknown/unspecified or generic error",
+    "-4": "empty list — no streams were specified to play",
+    "-5": "media error — the media format is unknown or unsupported",
+    "-6": "DRM error",
+    "docUrl": "https://developer.roku.com/dev/docs/video"
+  },
+  "errorCategories": {
+    "http": "Networking/HTTP layer (download failures, bad status, redirects, timeouts).",
+    "drm": "DRM layer (license acquisition, key handling, DRM lib).",
+    "mediaerror": "Media parsing/decoding (codec, container, fragmentation).",
+    "mediaplayer": "Media player/state machine.",
+    "docUrl": "https://developer.roku.com/dev/docs/video"
+  }
+}

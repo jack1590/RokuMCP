@@ -364,6 +364,16 @@ Record, analyze, and compare Perfetto traces from Roku devices. Requires **Roku 
 
 Workflow: enable tracing → start recording → interact with app → stop recording → analyze. The `.trace` files can also be opened at [ui.perfetto.dev](https://ui.perfetto.dev/).
 
+### Stream Diagnosis
+
+Figure out why an HLS/DASH stream that plays everywhere else fails on Roku.
+
+| Tool | Description |
+|---|---|
+| `roku_diagnose_stream` | Correlate the Video-node `errorInfo`, the manifest (a fetchable `url` or pasted `content`), and an optional Charles/HAR capture into ranked Roku-specific root causes (cause, evidence, confidence, severity, fix, doc link). Optionally `captureLive=true` deploys the bundled StreamProbe harness to capture the device error first. |
+
+It detects Roku-specific gotchas such as muxed audio+video in fMP4/CMAF HLS (plays video but silent), video codecs/levels beyond the hardware decoder (e.g. 4K H.264 or 8K HEVC), token/403-gated CDNs, and DRM license rejections. The static manifest checks are treated as hints; when you supply the real device `errorInfo` the diagnosis is corroborated to high confidence.
+
 ## Requirements
 
 - Node.js 18+

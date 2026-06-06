@@ -1,8 +1,16 @@
 node_modules/
 dist/
+dist-test/
 out/
 *.js.map
 sampleApp/
 .mcpregistry_*
 .smithery/
 server.json
+roku-mcp-notebookml.md
+
+# Test-stream media segments are regenerable via test-streams/generate.sh.
+# Commit the playlists (.m3u8) + generator, not the heavy binary segments.
+test-streams/**/*.m4s
+test-streams/**/*.mp4
+test-streams/**/*.ts

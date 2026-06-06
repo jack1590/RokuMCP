@@ -1,6 +1,6 @@
 {
   "name": "roku-mcp",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "MCP server for Roku device automation — deploy, ECP control, screenshots, debug console, and BrightScript profiler analysis",
   "type": "module",
   "main": "dist/index.js",
@@ -32,9 +32,13 @@
   "mcpName": "io.github.jack1590/RokuMCP",
   "author": "jack1590",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run copy-assets",
+    "copy-assets": "node -e \"const fs=require('fs');fs.cpSync('src/assets','dist/assets',{recursive:true});fs.copyFileSync('src/stream/roku-specs.json','dist/stream/roku-specs.json')\"",
     "watch": "tsc --watch",
     "start": "node dist/index.js",
+    "build:test": "tsc -p tsconfig.test.json && node -e \"const fs=require('fs');fs.copyFileSync('src/stream/roku-specs.json','dist-test/src/stream/roku-specs.json')\"",
+    "test": "npm run build:test && node --test dist-test/test/diagnose.regression.test.js",
+    "prepublishOnly": "npm test",
     "prepare": "npm run build"
   },
   "license": "MIT",

@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.7.0] - 2026-06-05
+
+### Added
+- `roku_diagnose_stream` — Diagnose why an HLS/DASH stream fails on Roku specifically. It is a correlation engine: combine the Video-node `errorInfo` the device reported, the manifest (a fetchable `url` or pasted `content`), and an optional Charles/HAR capture, and the tool cross-references them into ranked, plain-English root causes (cause, evidence, confidence, severity, fix, doc link). No device is required for the default path; optionally set `captureLive=true` to deploy the bundled StreamProbe harness and capture the device error first.
+- Roku stream specs are externalized in a dated, doc-sourced `roku-specs.json` (supported codecs/containers/DRM, decoder limits, error codes) so the heuristics are easy to audit and update.
+- Bundled `StreamProbe` harness (`src/assets/streamprobe`) for the optional live capture path.
+
+### Improved
+- Diagnoser tuned against real on-device behavior (Roku Ultra, OS 15.2): muxed audio+video in fMP4/CMAF HLS is detected as silent playback (`audio="none"`) even with supported AAC; over-limit video decoders are recognized when the device reports `errorCode -3` / `category "mediaplayer"` (not only `-5`); findings now carry a `severity` so a won't-play issue ranks above a plays-but-silent one. When a `url` is provided, one child media playlist is fetched to confirm the fMP4-vs-TS container.
+
+### Testing
+- Added an automated regression suite (`npm test`, Node's built-in test runner) covering the diagnoser against device-verified fixtures in `test-streams/`, plus a control stream that must produce zero findings. Releases are now gated on the tests (`prepublishOnly`).
+
 ## [1.6.0] - 2026-05-21
 
 ### Added

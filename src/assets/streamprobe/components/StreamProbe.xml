@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- StreamProbe scene: plays the stream described by deep-link args and exposes
+     the Video node error fields (errorCode/errorMsg/errorInfo) for RTA capture. -->
+
+<component name="StreamProbe" extends="Scene">
+
+  <interface>
+    <field id="launchArgs" type="assocarray" onChange="onLaunchArgs" />
+    <!-- Mirror fields the diagnoser reads via RTA getValue. -->
+    <field id="probeState" type="string" value="idle" />
+    <field id="probeErrorCode" type="integer" value="0" />
+    <field id="probeErrorMsg" type="string" value="" />
+    <field id="probeErrorInfo" type="string" value="" />
+  </interface>
+
+  <script type="text/brightscript">
+  <![CDATA[
+
+    sub init()
+      m.video = m.top.findNode("probeVideo")
+      m.video.observeField("state", "onVideoState")
+    end sub
+
+    ' Re-entrant: launch args may arrive after init.
+    sub onLaunchArgs()
+      startPlayback(m.top.launchArgs)
+    end sub
+
+    sub startPlayback(args as dynamic)
+      if args = invalid then return
+
+      url = pickArg(args, "input_url", "url")
+      if url = invalid or url = "" then return
+
+      format = pickArg(args, "input_format", "format")
+      if format = invalid or format = "" then format = "hls"
+
+      content = createObject("RoSGNode", "ContentNode")
+      content.title = "StreamProbe"
+      content.streamFormat = format
+      content.url = url
+
+      keySystem = pickArg(args, "input_drm", "drm")
+      licenseUrl = pickArg(args, "input_license_url", "licenseServerURL")
+      if keySystem <> invalid and keySystem <> "" then
+        drmParams = { KeySystem: keySystem }
+        if licenseUrl <> invalid and licenseUrl <> "" then
+          drmParams.licenseServerURL = licenseUrl
+        end if
+        headerName = pickArg(args, "input_license_header_name", invalid)
+        headerValue = pickArg(args, "input_license_header_value", invalid)
+        if headerName <> invalid and headerName <> "" then
+          drmParams.licenseReqHeaders = [ { name: headerName, value: headerValue } ]
+        end if
+        content.drmParams = drmParams
+      end if
+
+      m.video.content = content
+      m.video.setFocus(true)
+      m.video.control = "play"
+      m.top.probeState = "requested"
+    end sub
+
+    function pickArg(args as object, primary as string, fallback as dynamic) as dynamic
+      if args.doesExist(primary) then return args[primary]
+      if fallback <> invalid and args.doesExist(fallback) then return args[fallback]
+      return invalid
+    end function
+
+    sub onVideoState()
+      st = m.video.state
+      m.top.probeState = st
+      ' Mirror to console (port 8085) so the error can be captured without RTA.
+      print "[StreamProbe] state changed "; st
+      if st = "error" then
+        m.top.probeErrorCode = m.video.errorCode
+        m.top.probeErrorMsg = m.video.errorMsg
+        info = m.video.errorInfo
+        print "[StreamProbe] errorCode = "; m.video.errorCode
+        print "[StreamProbe] errorMsg = "; m.video.errorMsg
+        if info <> invalid then
+          m.top.probeErrorInfo = formatJSON(info)
+          print "[StreamProbe] errorInfo = "; m.top.probeErrorInfo
+        end if
+      end if
+    end sub
+
+  ]]>
+  </script>
+
+  <children>
+    <Video id="probeVideo" width="1920" height="1080" />
+  </children>
+
+</component>
