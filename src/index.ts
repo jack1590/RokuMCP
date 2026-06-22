@@ -31,8 +31,18 @@ export default function createServer(_options?: { config?: Record<string, string
 
 const isDirectRun =
   typeof process !== 'undefined' &&
-  process.argv[1] &&
-  (process.argv[1].endsWith('/index.js') || process.argv[1].endsWith('/roku-mcp'));
+  !!process.argv[1] &&
+  (() => {
+    // Normalise Windows back-slashes: process.argv[1] is e.g.
+    // C:\...\dist\index.js, so the forward-slash endsWith checks below would
+    // never match and the stdio server would never start on Windows.
+    const entry = process.argv[1].replace(/\\/g, '/');
+    return (
+      entry.endsWith('/index.js') ||
+      entry.endsWith('/roku-mcp') ||
+      entry.endsWith('/roku-mcp.js')
+    );
+  })();
 
 if (isDirectRun) {
   (async () => {
