@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import net from 'net';
 import { resolveHost, friendlyError } from '../roku-config.js';
+import { isCaptureActive } from './console-capture.js';
 
 interface ConsoleSession {
   socket: net.Socket;
@@ -24,6 +25,12 @@ export function registerConsoleTools(server: McpServer): void {
     },
     async (params) => {
       try {
+        if (isCaptureActive()) {
+          return {
+            content: [{ type: 'text', text: 'A console capture is active and holds port 8085 (single client). Stop it with roku_console_capture_stop first.' }],
+            isError: true,
+          };
+        }
         if (session?.connected) {
           return {
             content: [{ type: 'text', text: `Already connected to ${session.host}. Disconnect first to connect to a different device.` }],

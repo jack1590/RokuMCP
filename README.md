@@ -250,7 +250,7 @@ Or simply add the two expected variables to your `.env` alongside your existing 
 
 | Tool | Description |
 |---|---|
-| `roku_deploy` | Sideload (deploy) a Roku app to the device |
+| `roku_deploy` | Sideload (deploy) a Roku app to the device. Stages in a temp folder (`stagingDir` overrides) so a project `bsconfig.json` can't make it wipe `rootDir` |
 | `roku_delete_dev_channel` | Delete the currently sideloaded developer channel |
 
 ### Discovery
@@ -266,7 +266,7 @@ Or simply add the two expected variables to your `.env` alongside your existing 
 | `roku_keypress` | Send a single key press (Home, Select, Up, Down, Left, Right, Back, etc.) |
 | `roku_keypress_sequence` | Send multiple key presses in sequence with configurable delay |
 | `roku_type_text` | Type a text string into the focused field (e.g. email, password, search) |
-| `roku_launch` | Launch or deep-link into a channel |
+| `roku_launch` | Launch or deep-link into a channel (`restart: true` exits it first) |
 | `roku_query_device_info` | Get device model, firmware, serial number, network info |
 | `roku_query_active_app` | Get the currently running app |
 | `roku_query_media_player` | Get media player state (play/pause/buffer/stop), position, and duration |
@@ -290,6 +290,10 @@ Or simply add the two expected variables to your `.env` alongside your existing 
 | `roku_console_read` | Read buffered console output and auto-disconnect |
 | `roku_console_send` | Send a command to the debug console and auto-disconnect |
 | `roku_console_disconnect` | Close the console connection (safety net) |
+| `roku_console_capture_start` | Keep port 8085 open and record the console to a file (skips the previous session's replay; default `./logs/<timestamp>-rokuDevice.log`) |
+| `roku_console_wait` | Wait for a captured line matching a regex; optional `predicate: "jwtValid"`. Returns line number, timestamp and a redacted preview, never the raw console |
+| `roku_console_capture_stop` | Stop the capture and close the file |
+| `roku_console_capture_status` | Report whether a capture is active, its file and size |
 
 ### Runtime UI Editing
 

@@ -113,11 +113,22 @@ export function registerEcpTools(server: McpServer): void {
           .record(z.string(), z.string())
           .optional()
           .describe('Optional launch parameters for deep linking (key-value pairs)'),
+        restart: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe('Exit the app first (ECP exit-app, falling back to Home) and wait ~1.5s. Channels with sdk_instant_resume only suspend on exit and will resume, not cold-start; use roku_deploy for a guaranteed cold start'),
       },
     },
     async (toolParams) => {
       try {
         const host = await resolveHost(toolParams);
+        if (toolParams.restart) {
+          await axios
+            .post(ecpUrl(host, `exit-app/${encodeURIComponent(toolParams.appId)}`))
+            .catch(() => axios.post(ecpUrl(host, 'keypress/Home')));
+          await new Promise((r) => setTimeout(r, 1500));
+        }
         const queryString = toolParams.params
           ? '?' + new URLSearchParams(toolParams.params as Record<string, string>).toString()
           : '';

@@ -19,6 +19,10 @@ export function registerDeployTools(server: McpServer): void {
           .array(z.string())
           .optional()
           .describe('Glob patterns for files to include. Defaults to all files in rootDir (**/*).'),
+        stagingDir: z
+          .string()
+          .optional()
+          .describe('Scratch folder roku-deploy empties, fills and deletes. Defaults to a unique temp folder; must not be rootDir.'),
       },
     },
     async (params) => {
@@ -35,11 +39,21 @@ export function registerDeployTools(server: McpServer): void {
 
         const config = await resolveConfig(params);
         const outDir = path.join(os.tmpdir(), 'roku-mcp-deploy');
+        // Explicit: otherwise roku-deploy picks stagingDir from a bsconfig.json/rokudeploy.json in cwd,
+        // and when that equals rootDir (e.g. "dist") it empties then deletes the build being deployed.
+        const stagingDir = path.resolve(params.stagingDir ?? path.join(os.tmpdir(), `roku-mcp-staging-${Date.now()}`));
+        if (stagingDir === path.resolve(params.rootDir)) {
+          return {
+            content: [{ type: 'text', text: 'Deploy failed: stagingDir must not be the same folder as rootDir (roku-deploy empties and deletes it).' }],
+            isError: true,
+          };
+        }
         const deployOptions: Record<string, unknown> = {
           host: config.host,
           password: config.password,
           rootDir: params.rootDir,
           outDir,
+          stagingDir,
           files: params.files && params.files.length > 0 ? params.files : ['**/*'],
           retainStagingDir: false,
         };

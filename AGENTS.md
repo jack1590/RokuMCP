@@ -16,7 +16,7 @@ Whatever name the user gave this MCP server in their client config (typically `r
 | Deploy | `roku_deploy`, `roku_delete_dev_channel`, `roku_launch` |
 | Remote control (ECP) | `roku_keypress`, `roku_keypress_sequence`, `roku_type_text` |
 | Inspection | `roku_screenshot`, `roku_query_app_ui`, `roku_query_sg_nodes`, `roku_find_node`, `roku_get_focused_node`, `roku_query_media_player` |
-| Debug console (port 8085) | `roku_console_connect`, `roku_console_send`, `roku_console_read`, `roku_console_disconnect` |
+| Debug console (port 8085) | `roku_console_connect`, `roku_console_send`, `roku_console_read`, `roku_console_disconnect`, `roku_console_capture_start`, `roku_console_wait`, `roku_console_capture_stop`, `roku_console_capture_status` |
 | Runtime UI editing (RTA, port 9000) | `roku_edit_node`, `roku_set_node_visible`, `roku_move_node`, `roku_focus_node`, `roku_remove_node`, `roku_create_node`, `roku_get_value`, `roku_observe_field` |
 | BrightScript profiler | `analyze_bsprof`, `compare_bsprof`, `bsprof_info` |
 | Perfetto tracing (Roku OS 15.1+) | `roku_perfetto_enable`, `roku_perfetto_start`, `roku_perfetto_stop`, `analyze_perfetto`, `compare_perfetto`, `query_perfetto` |
@@ -62,6 +62,23 @@ roku_screenshot                       # optional pixel-level verify
 - For text fields: first focus with `roku_keypress` (or RTA `roku_focus_node`), then `roku_type_text`.
 - For video tests: `roku_query_media_player` is the source of truth (`state` ∈ `{play, pause, buffer, stop, none}`, plus `position`, `duration`, `error`).
 - `roku_console_send` / `roku_console_read` **auto-disconnect** after each call; don't expect a persistent debugger session.
+
+## Console capture (record to file, wait for a line)
+
+Use when you need the console in a file or must wait for a specific log line (e.g. an HTTP request the app makes on startup):
+
+```
+roku_console_capture_start file=<project>/logs/<ts>-rokuDevice.log   # optional; defaults to ./logs/
+roku_deploy rootDir=<project>/dist        # guaranteed cold start
+#   or roku_launch appId=dev restart=true  # resumes instead if the channel uses sdk_instant_resume
+roku_console_wait pattern="<regex>" [predicate=jwtValid] [timeoutMs=120000]
+roku_console_capture_stop
+```
+
+- Port 8085 accepts **one client**. Detach the VS Code BrightScript debugger first; while a capture is active, `roku_console_connect` is refused.
+- `roku_console_wait` returns `{matched, lineNumber, timestamp, preview}` with tokens redacted. Read the full line from the capture file, never paste raw console output into chat.
+- `reason: "waiting_for_debugger"` means the channel was sideloaded by the VS Code debugger and is blocked on port 8081: redeploy with `roku_deploy`.
+- `reason: "timeout"` after `roku_launch restart=true`: the channel probably instant-resumed (no startup code ran). Use `roku_deploy` for a cold start.
 
 ## Runtime UI editing — required reading
 
@@ -109,6 +126,7 @@ When asked to deploy a workspace:
 1. Verify the manifest exists at `<rootDir>/manifest` before calling the tool.
 2. Pass `files` only when the user needs a non-default glob; otherwise let it default to `**/*`.
 3. After deploy, `roku_sleep` 3000–5000 ms before any UI interaction so the channel can finish launching.
+4. Staging happens in a temp folder. Never pass `stagingDir` equal to `rootDir`: roku-deploy empties and deletes the staging folder.
 
 ## Profiler & tracing
 

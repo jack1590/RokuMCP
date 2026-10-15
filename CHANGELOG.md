@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Console capture: `roku_console_capture_start`, `roku_console_wait`, `roku_console_capture_stop`, `roku_console_capture_status`. Keeps port 8085 open, records to a file (VS Code extension naming), skips the replay of the previous session, and waits for a regex line (optional `jwtValid` predicate) without returning raw console text.
+- `roku_launch`: `restart` exits the app first (ECP `exit-app`, Home fallback).
+- `roku_deploy`: optional `stagingDir`.
+
+### Fixed
+- `roku_deploy` emptied and deleted `rootDir` when the cwd had a `bsconfig.json`/`rokudeploy.json` whose `stagingDir` equals it (e.g. `dist`). Staging now defaults to a unique temp folder.
+
 ## [1.8.4] - 2026-10-11
 
 ### Fixed
