@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.9.0] - 2026-11-25
+
+### Added
+- Roku Cloud Emulator (RCE) support through the `roku-rce` library. Every device-facing tool accepts an optional `rceDevice` parameter (a Cloud Device id or exact name), and the new `ROKU_RCE_DEVICE` variable sets a default. The target precedence is: `host` parameter, then `rceDevice` parameter, then `ROKU_RCE_DEVICE`, then the host environment variables, then SSDP discovery.
+- New environment variables: `ROKU_RCE_TOKEN` (required for any RCE use), `ROKU_RCE_DEVICE` and `ROKU_RCE_PASSWORD` (the Cloud Device developer password). They are also offered as optional plugin settings in `.claude-plugin/plugin.json`.
+- New tools: `roku_rce_list_devices`, `roku_rce_start` (waits until the Run takes input and refuses a device that already has a Run), `roku_rce_stop` (waits for shutdown) and `roku_rce_status` (Run state, cost so far, auto-stop time, whether this server started the Run, and Snapshots). A Run costs $0.20 per hour, billed per minute from the start request, and RCE never stops an idle Run.
+- On RCE, ECP goes through the Instance API port proxy, key presses and `roku_type_text` go through the Instance API keypress endpoint, `roku_deploy` builds the zip with roku-deploy and installs it through RCE, `roku_delete_dev_channel` and `roku_screenshot` use the RCE installer, and the console tools use an RCE WebSocket bridge to port 8085. The edit-UI tools try a bridge to port 9000 and explain a closed port clearly; that path is unverified.
+- On shutdown (stdin close, SIGINT, SIGTERM, SIGHUP) the stdio server stops, on a best-effort basis, every RCE Run it started, including one whose start is still in flight. This cleanup covers the stdio entry only: a host that embeds `createServer()` with another transport must stop Runs itself (`roku_rce_stop`), or they bill until their max runtime.
+- Environment variable aliases: `ROKU_IP`, `ROKU_HOST` and `ROKU_DEV_TARGET` for `ROKU_DEVICE_HOST`; `ROKU_DEV_PASSWORD` and `ROKU_PASSWORD` for `ROKU_DEVICE_PASSWORD`. The canonical name wins when several are set. Empty `ROKU_*` values (for example unset plugin settings) and unexpanded `${...}` placeholders no longer hide a project `.env`.
+- `ROKU_MCP_ENV_FILE`: an absolute path to an extra `.env` file, for MCP clients that cannot set the server's working directory.
+- Every tool now has a `title` and explicit `readOnlyHint` and `destructiveHint` annotations. `roku_deploy`, `roku_delete_dev_channel`, `roku_remove_node`, `roku_diagnose_stream` (with `captureLive` it replaces the dev channel), `roku_rce_start` (it spends money) and `roku_rce_stop` (it can end another person's Run) are marked destructive; `roku_screenshot` is not read-only, since it writes a local file.
+
+### Changed
+- `roku_perfetto_enable`, `roku_perfetto_start` and `roku_diagnose_stream` with `captureLive` return a one-line error naming the alternative when the target is a Cloud Device. `roku_discover` remains LAN only and points to `roku_rce_list_devices`.
+- `roku_query_app_ui`, `roku_query_sg_nodes`, `roku_find_node`, `roku_get_focused_node` and `roku_query_media_player` report the RCE "Limited" ECP mode with the steps to switch the Cloud Device to Permissive.
+- `src/index.ts` builds the server in one factory and reads its version from `package.json`.
+
+### Fixed
+- Console tool descriptions no longer claim a persistent connection: `roku_console_connect` opens a connection for one `roku_console_read` or `roku_console_send` call. While a capture is active, `roku_console_read` and `roku_console_send` now point to `roku_console_wait` and the capture file.
+- `roku_deploy` also refuses a `stagingDir` inside `rootDir` or containing it (compared case-insensitively), not only the same folder.
+- `roku_type_text` reports only the number of characters typed, so a typed password no longer appears in the result.
+- ECP requests now time out (10 seconds; 30 seconds for `query/app-ui` and `query/sgnodes/*`) instead of hanging, on LAN devices and on Cloud Devices.
+- Error messages: a 404 from `roku_query_app_ui`, `roku_find_node` or `roku_get_focused_node` says that no dev channel is running, and a refused connection names the address, port and service.
+- Tool descriptions corrected for `roku_deploy`, `roku_perfetto_enable`, `roku_perfetto_start`, `roku_find_node`, `roku_sleep`, `roku_diagnose_stream` and the edit-UI tools.
+- Docs: removed the `baseUrl` parameter of `roku_diagnose_stream`, which never existed in the schema; added the console capture tools and section to the `rules/*` variants; corrected the claim that every tool accepts `host`.
+
 ## [1.8.5] - 2026-10-15
 
 ### Added

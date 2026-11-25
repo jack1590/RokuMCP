@@ -22,11 +22,15 @@ First launch runs `npm ci` and `npm run build` (needs Node 18+). Output goes to 
 
 ## Device credentials
 
-Resolution order, highest first:
+Target resolution order, highest first:
 
-1. Tool parameters `host` / `password`
-2. Env vars `ROKU_DEVICE_HOST` / `ROKU_DEVICE_PASSWORD`, also read from a project `.env`
-3. SSDP discovery (host only; password must come from 1 or 2)
+1. Tool parameter `host` (a LAN device)
+2. Tool parameter `rceDevice` (a Roku Cloud Emulator Cloud Device id or exact name)
+3. Env var `ROKU_RCE_DEVICE`
+4. Env var `ROKU_DEVICE_HOST` (aliases `ROKU_IP`, `ROKU_HOST`, `ROKU_DEV_TARGET`), also read from a project `.env`
+5. SSDP discovery on the LAN (host only)
+
+The password comes from the `password` parameter, then, for a Cloud Device, `ROKU_RCE_PASSWORD`, then `ROKU_DEVICE_PASSWORD` (aliases `ROKU_DEV_PASSWORD`, `ROKU_PASSWORD`). A LAN device never reads `ROKU_RCE_PASSWORD`. Any Cloud Device use also needs `ROKU_RCE_TOKEN`; see the `rce-cloud-emulator` skill.
 
 Do not invent an IP or password. If neither is available, ask the user.
 

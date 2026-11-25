@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import fs from 'fs/promises';
-import { resolveConfig, friendlyError } from '../roku-config.js';
+import { DESTRUCTIVE, friendlyError, passwordParam, rceUnsupported, resolveTarget, targetParams } from '../roku-config.js';
 import { normalizeRokuError, type NormalizedRokuError } from '../stream/error-info.js';
 import { loadManifest, type ManifestSummary, type StreamFormat } from '../stream/manifest.js';
 import { parseCharlesText, type CharlesSession } from '../stream/charles.js';
@@ -59,12 +59,14 @@ export function registerStreamTools(server: McpServer): void {
   server.registerTool(
     'roku_diagnose_stream',
     {
+      title: 'Diagnose stream',
+      annotations: DESTRUCTIVE, // captureLive replaces the installed dev channel
       description:
         'Diagnose why an HLS/DASH stream fails on Roku specifically by correlating the evidence you already have. ' +
         'Provide any combination of: the Video node error the device reported (errorInfo, as JSON or pasted log text), ' +
         'the manifest (a url to fetch, or pasted m3u8/mpd content), and a Charles/HAR HTTP capture file. ' +
         'The tool cross-references them into ranked root-cause findings (e.g. "errorCode -6 DRM + a 403 license POST = license server rejected the Roku request"). ' +
-        'No Roku device is required for this. Optionally set captureLive=true (with host+password) to deploy a bundled StreamProbe harness and capture the device error first when you do not have errorInfo yet.',
+        'No Roku device is required for this. Optionally set captureLive=true to deploy a bundled StreamProbe harness (replacing the installed dev channel) and capture the device error first when you do not have errorInfo yet; host and password fall back to ROKU_DEVICE_HOST / ROKU_DEVICE_PASSWORD (or their aliases) and SSDP discovery. captureLive is not supported on Roku Cloud Emulator devices.',
       inputSchema: {
         errorInfo: z
           .string()
@@ -89,9 +91,9 @@ export function registerStreamTools(server: McpServer): void {
           .boolean()
           .optional()
           .default(false)
-          .describe('When true and no errorInfo is provided, deploy the bundled StreamProbe harness to the device, play the stream, and capture the error. Requires host+password and a fetchable url.'),
-        host: z.string().optional().describe('IP/hostname of the Roku device (only for captureLive).'),
-        password: z.string().optional().describe('Developer password (only for captureLive).'),
+          .describe('When true and no errorInfo is provided, deploy the bundled StreamProbe harness to a LAN device, play the stream, and capture the error. Requires a fetchable url; host and password fall back to the environment.'),
+        ...targetParams,
+        password: passwordParam,
       },
     },
     async (params) => {
@@ -103,6 +105,12 @@ export function registerStreamTools(server: McpServer): void {
             isError: true,
           };
         }
+
+        const unsupported =
+          params.captureLive && !params.errorInfo
+            ? rceUnsupported(params, 'roku_diagnose_stream captureLive', 'Pass host for a LAN device, or play the stream in your own channel on the Cloud Device and pass the reported error as errorInfo.')
+            : undefined;
+        if (unsupported) return { content: [{ type: 'text', text: unsupported }], isError: true };
 
         const reportNotes: string[] = [];
 
@@ -155,10 +163,10 @@ export function registerStreamTools(server: McpServer): void {
             reportNotes.push('captureLive was requested but no `url` was provided — a live playback test needs a fetchable stream URL. Skipped live capture.');
           } else {
             try {
-              const config = await resolveConfig(params);
+              const config = await resolveTarget(params, { needPassword: true });
               liveCapture = await captureLive({
-                host: config.host,
-                password: config.password,
+                host: config.host!,
+                password: config.password!,
                 url: params.url,
                 format: (params.format as string | undefined) ?? manifest?.format,
                 drm: params.drm,

@@ -1,9 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import net from 'net';
+import type { Duplex } from 'stream';
 import fs from 'fs';
 import path from 'path';
-import { resolveHost, friendlyError } from '../roku-config.js';
+import { READ_ONLY, WRITES, friendlyError, resolveTarget, targetParams } from '../roku-config.js';
 
 const CONSOLE_PORT = 8085;
 const MAX_KEPT_LINES = 50_000;
@@ -27,7 +27,7 @@ interface Waiter {
 }
 
 interface CaptureSession {
-  socket: net.Socket;
+  socket: Duplex;
   host: string;
   file: string;
   out: fs.WriteStream;
@@ -127,12 +127,14 @@ export function registerConsoleCaptureTools(server: McpServer): void {
   server.registerTool(
     'roku_console_capture_start',
     {
+      title: 'Start console capture',
+      annotations: WRITES,
       description:
         'Start recording the BrightScript debug console (port 8085) to a file, keeping the connection open until roku_console_capture_stop. ' +
         'Output from before the capture (the console replays the previous session on connect) is skipped. Console text is never returned; use roku_console_wait to detect lines. ' +
-        'Port 8085 accepts a single client: detach the VS Code BrightScript debugger first.',
+        'Port 8085 accepts a single client: detach the VS Code BrightScript debugger first. On a Roku Cloud Emulator device the console is reached through an RCE WebSocket bridge.',
       inputSchema: {
-        host: z.string().optional().describe('IP address or hostname of the Roku device'),
+        ...targetParams,
         file: z.string().optional().describe('Absolute or cwd-relative log path. Defaults to ./logs/<YYYY-MM-DDTHH∶MM∶SS>-rokuDevice.log'),
         append: z.boolean().optional().default(false).describe('Append to the file instead of truncating it'),
         settleMs: z.number().optional().default(2000).describe('Discard console output received during this window after connecting (replay of the previous session)'),
@@ -143,11 +145,12 @@ export function registerConsoleCaptureTools(server: McpServer): void {
         return { content: [{ type: 'text', text: `Capture already active: ${summary(capture)}` }], isError: true };
       }
       try {
-        const host = await resolveHost(params);
+        const target = await resolveTarget(params);
+        const host = target.label;
         const file = path.resolve(params.file ?? path.join('logs', defaultLogFileName()));
         fs.mkdirSync(path.dirname(file), { recursive: true });
 
-        const socket = new net.Socket();
+        const socket = await target.connect(CONSOLE_PORT, 10_000);
         const session: CaptureSession = {
           socket,
           host,
@@ -162,21 +165,6 @@ export function registerConsoleCaptureTools(server: McpServer): void {
           replayBytes: 0,
           waiters: new Set(),
         };
-
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            socket.destroy();
-            reject(new Error(`Connection to ${host}:${CONSOLE_PORT} timed out`));
-          }, 10_000);
-          socket.once('error', (err) => {
-            clearTimeout(timeout);
-            reject(err);
-          });
-          socket.connect(CONSOLE_PORT, host, () => {
-            clearTimeout(timeout);
-            resolve();
-          });
-        });
 
         capture = session;
         socket.on('data', (data) => {
@@ -217,6 +205,8 @@ export function registerConsoleCaptureTools(server: McpServer): void {
   server.registerTool(
     'roku_console_wait',
     {
+      title: 'Wait for console line',
+      annotations: READ_ONLY,
       description:
         'Wait until a console line matching a regex appears in the active capture (see roku_console_capture_start). ' +
         'Returns line number, timestamp and a short redacted preview; the full line is in the capture file. ' +
@@ -273,6 +263,8 @@ export function registerConsoleCaptureTools(server: McpServer): void {
   server.registerTool(
     'roku_console_capture_stop',
     {
+      title: 'Stop console capture',
+      annotations: WRITES,
       description: 'Stop the active console capture, flush and close the file. Returns file path, bytes and line count.',
     },
     async (): Promise<ToolResult> => {
@@ -288,6 +280,8 @@ export function registerConsoleCaptureTools(server: McpServer): void {
   server.registerTool(
     'roku_console_capture_status',
     {
+      title: 'Console capture status',
+      annotations: READ_ONLY,
       description: 'Report whether a console capture is active, its file, bytes and line count.',
     },
     async (): Promise<ToolResult> => ({

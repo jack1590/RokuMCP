@@ -13,7 +13,7 @@ import {
   BsprofParser,
 } from 'bsprof-cli';
 import type { AnalysisOptions, FullReport, SummaryReport, ParsedProfile, HeaderInfo } from 'bsprof-cli';
-import { friendlyError } from '../roku-config.js';
+import { READ_ONLY, friendlyError } from '../roku-config.js';
 
 function jsonify(value: unknown): string {
   return JSON.stringify(value, (_k, v) => (typeof v === 'bigint' ? Number(v) : v), 2);
@@ -110,6 +110,8 @@ export function registerBsprofTools(server: McpServer): void {
   server.registerTool(
     'analyze_bsprof',
     {
+      title: 'Analyze .bsprof profile',
+      annotations: READ_ONLY,
       description:
         'Analyze a BrightScript Profiler (.bsprof) file from a Roku device. Supports memory leak detection, CPU hot-path analysis, combined full reports, and one-page summaries. Returns structured JSON.',
       inputSchema: {
@@ -185,6 +187,8 @@ export function registerBsprofTools(server: McpServer): void {
   server.registerTool(
     'compare_bsprof',
     {
+      title: 'Compare .bsprof profiles',
+      annotations: READ_ONLY,
       description:
         'Compare two BrightScript Profiler (.bsprof) files to detect regressions, improvements, new memory leaks, resolved leaks, and CPU time deltas between runs.',
       inputSchema: {
@@ -225,6 +229,8 @@ export function registerBsprofTools(server: McpServer): void {
   server.registerTool(
     'bsprof_info',
     {
+      title: 'Read .bsprof header',
+      annotations: READ_ONLY,
       description:
         'Get header metadata from a .bsprof file without full analysis — target name, device model, firmware, format version, duration, file size, and enabled features. Reads only the header/footer, so it is instant even on multi-hundred-MB profiles.',
       inputSchema: {

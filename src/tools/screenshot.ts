@@ -2,40 +2,45 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { rokuDeploy } from 'roku-deploy';
 import fs from 'fs/promises';
+import os from 'os';
 import path from 'path';
-import { resolveConfig, friendlyError } from '../roku-config.js';
+import { WRITES, friendlyError, passwordParam, resolveTarget, targetParams } from '../roku-config.js';
 
 export function registerScreenshotTools(server: McpServer): void {
   server.registerTool(
     'roku_screenshot',
     {
+      title: 'Take screenshot',
+      annotations: WRITES, // writes the image to a local file
       description: 'Capture a screenshot of the current screen on the Roku device. A sideloaded dev channel must be running. Returns the image as base64-encoded content and the file path where it was saved.',
       inputSchema: {
-        host: z.string().optional().describe('IP address or hostname of the Roku device'),
-        password: z.string().optional().describe('Developer password for the Roku device'),
+        ...targetParams,
+        password: passwordParam,
         outDir: z.string().optional().describe('Directory to save the screenshot. Defaults to OS temp directory.'),
         outFile: z.string().optional().describe('Base filename (without extension). Defaults to timestamped name.'),
       },
     },
     async (params) => {
       try {
-        const config = await resolveConfig(params);
-        const options: Record<string, unknown> = {
-          host: config.host,
-          password: config.password,
-        };
-
-        if (params.outDir) {
-          options.outDir = params.outDir;
+        const target = await resolveTarget(params, { needPassword: true });
+        let filePath: string;
+        let imageBuffer: Buffer;
+        if (target.rce) {
+          const shot = await target.rce.instance.screenshot();
+          const dir = params.outDir ?? os.tmpdir();
+          await fs.mkdir(dir, { recursive: true });
+          filePath = path.join(dir, `${params.outFile ?? `screenshot-${Date.now()}`}.${shot.extension}`);
+          await fs.writeFile(filePath, shot.data);
+          imageBuffer = shot.data;
+        } else {
+          const options: Record<string, unknown> = { host: target.host, password: target.password };
+          if (params.outDir) options.outDir = params.outDir;
+          if (params.outFile) options.outFile = params.outFile;
+          filePath = await rokuDeploy.takeScreenshot(options as any);
+          imageBuffer = await fs.readFile(filePath);
         }
-        if (params.outFile) {
-          options.outFile = params.outFile;
-        }
-
-        const filePath = await rokuDeploy.takeScreenshot(options as any);
         const ext = path.extname(filePath).toLowerCase();
         const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
-        const imageBuffer = await fs.readFile(filePath);
         const base64 = imageBuffer.toString('base64');
 
         return {

@@ -5,7 +5,10 @@
       "args": ["${CLAUDE_PLUGIN_ROOT}/bootstrap.mjs"],
       "env": {
         "ROKU_DEVICE_HOST": "${user_config.ROKU_DEVICE_HOST}",
-        "ROKU_DEVICE_PASSWORD": "${user_config.ROKU_DEVICE_PASSWORD}"
+        "ROKU_DEVICE_PASSWORD": "${user_config.ROKU_DEVICE_PASSWORD}",
+        "ROKU_RCE_TOKEN": "${user_config.ROKU_RCE_TOKEN}",
+        "ROKU_RCE_DEVICE": "${user_config.ROKU_RCE_DEVICE}",
+        "ROKU_RCE_PASSWORD": "${user_config.ROKU_RCE_PASSWORD}"
       }
     }
   }

@@ -11,11 +11,11 @@ description: Sideload a Roku BrightScript/SceneGraph app to a dev device, redepl
 2. `roku_deploy` with `rootDir` (absolute path). Pass `files` only for a non-default glob; the default is `**/*`.
 3. `roku_sleep` 3000–5000 ms before any UI interaction so the channel finishes launching.
 
-A running dev channel is replaced. `roku_delete_dev_channel` removes it.
+Deploying replaces the installed dev channel and cold-starts it. `roku_delete_dev_channel` removes it. On a Roku Cloud Emulator Cloud Device, pass `rceDevice` (see the `rce-cloud-emulator` skill).
 
 ## Console
 
-- `roku_console_send` and `roku_console_read` each open, run, and close the connection. Do not expect a persistent session.
+- `roku_console_connect` opens a connection for one `roku_console_read` or `roku_console_send` call, which then closes it. Do not expect a persistent session; use the capture tools below to stream.
 - Read after a repro step, not in a loop.
 
 ## Capture to a file and wait for a line

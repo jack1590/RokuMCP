@@ -10,8 +10,8 @@
     {
       "name": "roku-mcp",
       "source": "./",
-      "description": "Roku app automation, profiling, and stream diagnosis for dev devices.",
-      "version": "1.8.5"
+      "description": "Roku app automation, profiling, and stream diagnosis for LAN dev devices and Roku Cloud Emulator.",
+      "version": "1.9.0"
     }
   ]
 }

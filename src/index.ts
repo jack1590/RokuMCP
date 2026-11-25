@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import 'dotenv/config';
+import './env.js';
+import { createRequire } from 'module';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerDeployTools } from './tools/deploy.js';
 import { registerEcpTools } from './tools/ecp.js';
@@ -11,13 +12,14 @@ import { registerBsprofTools } from './tools/bsprof.js';
 import { registerPerfettoTools } from './tools/perfetto.js';
 import { registerEditUiTools } from './tools/edit-ui.js';
 import { registerStreamTools } from './tools/stream.js';
+import { registerRceTools } from './tools/rce.js';
+import { stopStartedRuns } from './rce.js';
 
-export default function createServer(_options?: { config?: Record<string, string> }) {
-  const server = new McpServer({
-    name: 'roku-mcp',
-    version: '1.8.5',
-  });
+const { version } = createRequire(import.meta.url)('../package.json') as { version: string };
 
+/** Registers every tool on a new McpServer. */
+export function buildServer(): McpServer {
+  const server = new McpServer({ name: 'roku-mcp', version });
   registerDeployTools(server);
   registerEcpTools(server);
   registerScreenshotTools(server);
@@ -27,8 +29,12 @@ export default function createServer(_options?: { config?: Record<string, string
   registerPerfettoTools(server);
   registerEditUiTools(server);
   registerStreamTools(server);
+  registerRceTools(server);
+  return server;
+}
 
-  return server.server;
+export default function createServer(_options?: { config?: Record<string, string> }) {
+  return buildServer().server;
 }
 
 const isDirectRun =
@@ -46,25 +52,25 @@ const isDirectRun =
     );
   })();
 
+let shuttingDown = false;
+/** Stops the Cloud Device Runs this server started. MCP clients SIGKILL about 4 s after closing stdin. */
+async function shutdown(): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  try {
+    const result = await stopStartedRuns(3500);
+    for (const f of result.failed) console.error(`roku-mcp: could not stop RCE Run ${f.runId ?? '(not shown yet)'} on Cloud Device ${f.deviceId}: ${f.message}`);
+  } finally {
+    process.exit(0);
+  }
+}
+
 if (isDirectRun) {
   (async () => {
     const { StdioServerTransport } = await import('@modelcontextprotocol/sdk/server/stdio.js');
-    const server = new McpServer({
-      name: 'roku-mcp',
-      version: '1.8.5',
-    });
-
-    registerDeployTools(server);
-    registerEcpTools(server);
-    registerScreenshotTools(server);
-    registerConsoleTools(server);
-    registerConsoleCaptureTools(server);
-    registerBsprofTools(server);
-    registerPerfettoTools(server);
-    registerEditUiTools(server);
-    registerStreamTools(server);
-
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
+    await buildServer().connect(new StdioServerTransport());
+    process.stdin.on('end', shutdown);
+    process.stdin.on('close', shutdown);
+    for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.on(signal, shutdown);
   })();
 }

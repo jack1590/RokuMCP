@@ -4,16 +4,28 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import { rokuDeploy } from 'roku-deploy';
-import { resolveConfig, friendlyError } from '../roku-config.js';
+import { DESTRUCTIVE, friendlyError, passwordParam, resolveTarget, targetParams } from '../roku-config.js';
+
+/** Whether either folder is, or contains, the other. Case-insensitive, since macOS file systems usually are. */
+export function overlaps(a: string, b: string): boolean {
+  const [x, y] = [path.resolve(a).toLowerCase(), path.resolve(b).toLowerCase()];
+  const inside = (child: string, parent: string) => {
+    const rel = path.relative(parent, child);
+    return rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
+  };
+  return inside(x, y) || inside(y, x);
+}
 
 export function registerDeployTools(server: McpServer): void {
   server.registerTool(
     'roku_deploy',
     {
-      description: 'Sideload (deploy) a Roku application to the device. Packages all files in the project directory and uploads them. A dev channel must not already be running, or it will be replaced.',
+      title: 'Deploy dev channel',
+      annotations: DESTRUCTIVE,
+      description: 'Sideload (deploy) a Roku application to the device. Packages the files in rootDir into a zip and uploads it, which replaces the installed dev channel and cold-starts it. Works on LAN devices and on Roku Cloud Emulator devices (rceDevice).',
       inputSchema: {
-        host: z.string().optional().describe('IP address or hostname of the Roku device'),
-        password: z.string().optional().describe('Developer password for the Roku device'),
+        ...targetParams,
+        password: passwordParam,
         rootDir: z.string().describe('Absolute path to the project root directory containing the manifest file'),
         files: z
           .array(z.string())
@@ -22,7 +34,7 @@ export function registerDeployTools(server: McpServer): void {
         stagingDir: z
           .string()
           .optional()
-          .describe('Scratch folder roku-deploy empties, fills and deletes. Defaults to a unique temp folder; must not be rootDir.'),
+          .describe('Scratch folder roku-deploy empties, fills and deletes. Defaults to a unique temp folder; must not be rootDir, inside it, or contain it.'),
       },
     },
     async (params) => {
@@ -37,20 +49,20 @@ export function registerDeployTools(server: McpServer): void {
           };
         }
 
-        const config = await resolveConfig(params);
+        const target = await resolveTarget(params, { needPassword: true });
         const outDir = path.join(os.tmpdir(), 'roku-mcp-deploy');
         // Explicit: otherwise roku-deploy picks stagingDir from a bsconfig.json/rokudeploy.json in cwd,
         // and when that equals rootDir (e.g. "dist") it empties then deletes the build being deployed.
         const stagingDir = path.resolve(params.stagingDir ?? path.join(os.tmpdir(), `roku-mcp-staging-${Date.now()}`));
-        if (stagingDir === path.resolve(params.rootDir)) {
+        if (overlaps(stagingDir, params.rootDir)) {
           return {
-            content: [{ type: 'text', text: 'Deploy failed: stagingDir must not be the same folder as rootDir (roku-deploy empties and deletes it).' }],
+            content: [{ type: 'text', text: 'Deploy failed: stagingDir must not be rootDir, inside it, or contain it (roku-deploy empties and deletes it).' }],
             isError: true,
           };
         }
-        const deployOptions: Record<string, unknown> = {
-          host: config.host,
-          password: config.password,
+        const deployOptions = {
+          host: target.host,
+          password: target.password,
           rootDir: params.rootDir,
           outDir,
           stagingDir,
@@ -58,9 +70,18 @@ export function registerDeployTools(server: McpServer): void {
           retainStagingDir: false,
         };
 
+        if (target.rce) {
+          await rokuDeploy.createPackage(deployOptions);
+          const zipPath = rokuDeploy.getOutputZipFilePath(deployOptions);
+          const result = await target.rce.instance.install(await fs.readFile(zipPath), path.basename(zipPath));
+          const note = result.outcome === 'identical' ? ' (the device reported the package as identical to the installed one)' : '';
+          return {
+            content: [{ type: 'text', text: `Successfully deployed app from ${params.rootDir} to ${target.label}${note}` }],
+          };
+        }
         await rokuDeploy.deploy(deployOptions);
         return {
-          content: [{ type: 'text', text: `Successfully deployed app from ${params.rootDir} to ${config.host}` }],
+          content: [{ type: 'text', text: `Successfully deployed app from ${params.rootDir} to ${target.label}` }],
         };
       } catch (error) {
         return {
@@ -74,21 +95,21 @@ export function registerDeployTools(server: McpServer): void {
   server.registerTool(
     'roku_delete_dev_channel',
     {
-      description: 'Delete the currently sideloaded developer channel from the Roku device.',
+      title: 'Delete dev channel',
+      annotations: DESTRUCTIVE,
+      description: 'Delete the currently sideloaded developer channel from the Roku device (LAN or Roku Cloud Emulator).',
       inputSchema: {
-        host: z.string().optional().describe('IP address or hostname of the Roku device'),
-        password: z.string().optional().describe('Developer password for the Roku device'),
+        ...targetParams,
+        password: passwordParam,
       },
     },
     async (params) => {
       try {
-        const config = await resolveConfig(params);
-        await rokuDeploy.deleteInstalledChannel({
-          host: config.host,
-          password: config.password,
-        });
+        const target = await resolveTarget(params, { needPassword: true });
+        if (target.rce) await target.rce.instance.deleteDevChannel();
+        else await rokuDeploy.deleteInstalledChannel({ host: target.host!, password: target.password! });
         return {
-          content: [{ type: 'text', text: `Successfully deleted dev channel from ${config.host}` }],
+          content: [{ type: 'text', text: `Successfully deleted dev channel from ${target.label}` }],
         };
       } catch (error) {
         return {

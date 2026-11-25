@@ -4,10 +4,20 @@ import os from 'os';
 import path from 'path';
 import { PerfettoClient, RokuAnalyzer, comparePerfetto, openTrace } from 'roku-perfetto';
 import type { AnalysisMode } from 'roku-perfetto';
-import { resolveHost, friendlyError } from '../roku-config.js';
+import { READ_ONLY, WRITES, friendlyError, rceUnsupported, resolveTarget, targetParams, type TargetParams } from '../roku-config.js';
 
 function jsonify(value: unknown): string {
   return JSON.stringify(value, (_k, v) => (typeof v === 'bigint' ? Number(v) : v), 2);
+}
+
+const PERFETTO_ALTERNATIVE =
+  'roku-perfetto talks to port 8060 and a plain WebSocket on the device directly, which RCE does not expose. Use a LAN Roku device (pass host), or profile with a .bsprof capture (analyze_bsprof).';
+
+/** Perfetto needs direct LAN access; returns the host or throws a one-line error for Cloud Devices. */
+async function lanHost(params: TargetParams, tool: string): Promise<string> {
+  const unsupported = rceUnsupported(params, tool, PERFETTO_ALTERNATIVE);
+  if (unsupported) throw new Error(unsupported);
+  return (await resolveTarget(params)).host!;
 }
 
 let client: PerfettoClient | null = null;
@@ -20,10 +30,12 @@ export function registerPerfettoTools(server: McpServer): void {
   server.registerTool(
     'roku_perfetto_enable',
     {
+      title: 'Enable Perfetto tracing',
+      annotations: WRITES,
       description:
-        'Enable Perfetto tracing for a Roku channel via ECP. Tracing starts automatically on each app launch. Requires Roku OS 15.1+. There is no disable command — enabled channels are cleared on reboot.',
+        'Enable Perfetto tracing for a Roku channel via ECP. Tracing starts automatically on each app launch, so relaunch the channel afterwards and then call roku_perfetto_start. Requires Roku OS 15.1+ on a LAN device (not supported on Roku Cloud Emulator). There is no disable command — enabled channels are cleared on reboot.',
       inputSchema: {
-        host: z.string().optional().describe('IP address or hostname of the Roku device'),
+        ...targetParams,
         channelId: z
           .string()
           .optional()
@@ -33,7 +45,7 @@ export function registerPerfettoTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const host = await resolveHost(params);
+        const host = await lanHost(params, 'roku_perfetto_enable');
         client = new PerfettoClient(host);
         clientHost = host;
         const result = await client.enable(params.channelId ?? 'dev');
@@ -55,10 +67,12 @@ export function registerPerfettoTools(server: McpServer): void {
   server.registerTool(
     'roku_perfetto_start',
     {
+      title: 'Start Perfetto recording',
+      annotations: WRITES,
       description:
-        'Start recording a Perfetto trace from the Roku device. Opens a binary WebSocket to stream trace data to a local file. Only one recording session at a time. Call roku_perfetto_enable first.',
+        'Start recording a Perfetto trace from the Roku device. The order is strict: roku_perfetto_enable, then relaunch the channel, then roku_perfetto_start. Opens a binary WebSocket to stream trace data to a local file. Only one recording session at a time. LAN devices only (not supported on Roku Cloud Emulator).',
       inputSchema: {
-        host: z.string().optional().describe('IP address or hostname of the Roku device'),
+        ...targetParams,
         channelId: z.string().optional().default('dev').describe('Channel ID (default: "dev")'),
         outDir: z.string().optional().describe('Directory to save the trace file (default: OS temp directory)'),
         outFile: z.string().optional().describe('Filename without extension (default: timestamped name)'),
@@ -66,7 +80,7 @@ export function registerPerfettoTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const host = await resolveHost(params);
+        const host = await lanHost(params, 'roku_perfetto_start');
         if (!client || clientHost !== host) {
           client = new PerfettoClient(host);
           clientHost = host;
@@ -98,6 +112,8 @@ export function registerPerfettoTools(server: McpServer): void {
   server.registerTool(
     'roku_perfetto_stop',
     {
+      title: 'Stop Perfetto recording',
+      annotations: WRITES,
       description:
         'Stop the active Perfetto trace recording. Returns the file path, size, and duration. The resulting .trace file can be opened at https://ui.perfetto.dev/ or analyzed with analyze_perfetto.',
     },
@@ -132,6 +148,8 @@ export function registerPerfettoTools(server: McpServer): void {
   server.registerTool(
     'analyze_perfetto',
     {
+      title: 'Analyze Perfetto trace',
+      annotations: READ_ONLY,
       description:
         'Analyze a Roku Perfetto trace file (.trace). Returns structured JSON with AI-friendly suggestion fields for each analysis area. Requires the trace_processor binary (auto-downloaded on first use). Modes: summary (full report), frame-drops, key-events, observers, rendezvous, set-fields, threads.',
       inputSchema: {
@@ -198,6 +216,8 @@ export function registerPerfettoTools(server: McpServer): void {
   server.registerTool(
     'compare_perfetto',
     {
+      title: 'Compare Perfetto traces',
+      annotations: READ_ONLY,
       description:
         'Compare two Roku Perfetto trace files to detect performance regressions and improvements. Returns metric deltas for frame drops, key events, observers, rendezvous, and setField calls.',
       inputSchema: {
@@ -229,6 +249,8 @@ export function registerPerfettoTools(server: McpServer): void {
   server.registerTool(
     'query_perfetto',
     {
+      title: 'Query Perfetto trace',
+      annotations: READ_ONLY,
       description:
         'Run a raw PerfettoSQL query against a Roku Perfetto trace file. Use for custom analysis beyond the built-in modes. Common queries: SELECT * FROM slice WHERE name = \'swapBuffers\' ORDER BY dur DESC; SELECT * FROM slice WHERE name = \'keyEvent\' ORDER BY dur DESC;',
       inputSchema: {

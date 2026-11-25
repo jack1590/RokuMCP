@@ -19,6 +19,7 @@ import { rokuDeploy } from 'roku-deploy';
 import axios from 'axios';
 import type { NormalizedRokuError } from './error-info.js';
 import { normalizeRokuError } from './error-info.js';
+import { ECP_TIMEOUT_MS } from '../roku-config.js';
 
 const RTA_PORT = 9000;
 const HEADER_SIZE = 8;
@@ -208,7 +209,7 @@ export async function captureLive(params: LiveCaptureParams): Promise<LiveCaptur
     }
   }
   const qs = new URLSearchParams(launchParams).toString();
-  await axios.post(`http://${params.host}:8060/launch/dev?${qs}`);
+  await axios.post(`http://${params.host}:8060/launch/dev?${qs}`, undefined, { timeout: ECP_TIMEOUT_MS });
 
   // 3. Give the channel time to boot + RTA to come up.
   await new Promise((r) => setTimeout(r, 5000));

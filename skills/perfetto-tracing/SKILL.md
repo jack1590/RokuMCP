@@ -5,7 +5,7 @@ description: Record and analyze Perfetto traces from Roku devices (Roku OS 15.1+
 
 # Perfetto tracing
 
-Strict order. Skipping a step produces an empty trace.
+Strict order. Skipping a step produces an empty trace. Perfetto needs a LAN device: on a Roku Cloud Emulator Cloud Device, `roku_perfetto_enable` and `roku_perfetto_start` return an error, so profile with a `.bsprof` capture instead.
 
 1. `roku_perfetto_enable`
 2. Relaunch the channel (`roku_launch` or `roku_deploy`), then `roku_sleep` 3000–5000 ms

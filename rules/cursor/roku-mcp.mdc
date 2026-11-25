@@ -23,11 +23,12 @@ Whatever name the user gave this MCP server in their client config (typically `r
 | Deploy | `roku_deploy`, `roku_delete_dev_channel`, `roku_launch` |
 | Remote control (ECP) | `roku_keypress`, `roku_keypress_sequence`, `roku_type_text` |
 | Inspection | `roku_screenshot`, `roku_query_app_ui`, `roku_query_sg_nodes`, `roku_find_node`, `roku_get_focused_node`, `roku_query_media_player` |
-| Debug console (port 8085) | `roku_console_connect`, `roku_console_send`, `roku_console_read`, `roku_console_disconnect` |
+| Debug console (port 8085) | `roku_console_connect`, `roku_console_send`, `roku_console_read`, `roku_console_disconnect`, `roku_console_capture_start`, `roku_console_wait`, `roku_console_capture_stop`, `roku_console_capture_status` |
 | Runtime UI editing (RTA, port 9000) | `roku_edit_node`, `roku_set_node_visible`, `roku_move_node`, `roku_focus_node`, `roku_remove_node`, `roku_create_node`, `roku_get_value`, `roku_observe_field` |
 | BrightScript profiler | `analyze_bsprof`, `compare_bsprof`, `bsprof_info` |
 | Perfetto tracing (Roku OS 15.1+) | `roku_perfetto_enable`, `roku_perfetto_start`, `roku_perfetto_stop`, `analyze_perfetto`, `compare_perfetto`, `query_perfetto` |
 | Stream diagnosis | `roku_diagnose_stream` |
+| Roku Cloud Emulator (billed) | `roku_rce_list_devices`, `roku_rce_start`, `roku_rce_stop`, `roku_rce_status` |
 
 ## Stream diagnosis (`roku_diagnose_stream`)
 
@@ -40,17 +41,43 @@ Diagnose why an HLS/DASH stream fails **on Roku specifically** by correlating ev
 
 The tool cross-references them into ranked findings (`cause`, `evidence[]`, `confidence`, `severity`, `fix`, `docUrl`). Correlated diagnoses are highest confidence — e.g. `errorCode -6` (DRM) plus a license `POST` returning 403 in the Charles session yields "license server rejected the Roku request". It detects Roku-specific gotchas like muxed audio+video in fMP4/CMAF HLS (plays video but silent), video codecs/levels beyond the hardware decoder (4K H.264, 8K HEVC), token/403-gated CDNs, and DRM license rejections. Spec hints come from a dated, cited `roku-specs.json` and are explicitly heuristic.
 
-Optional fallback: when no `errorInfo` is provided and a device is available, set `captureLive: true` (with `host`/`password` and a fetchable `url`) to deploy the bundled StreamProbe harness, play the stream, and capture the real device error before correlating.
+Optional fallback: when no `errorInfo` is provided and a device is available, set `captureLive: true` with a fetchable `url` (`host` and `password` fall back to the environment and SSDP; not supported on Roku Cloud Emulator) to deploy the bundled StreamProbe harness, play the stream, and capture the real device error before correlating.
 
 ## Connection resolution
 
-Every tool accepts `host` (and `password` for deploy/screenshot). Resolution order:
+Device-facing tools accept `host` and `rceDevice` (a Roku Cloud Emulator Cloud Device id or exact name). `roku_deploy`, `roku_delete_dev_channel`, `roku_screenshot` and `roku_diagnose_stream` (for `captureLive`) also accept `password`. The target is chosen in this order:
 
-1. Explicit `host` / `password` tool params (highest priority — pass these whenever the user gave you a specific device).
-2. `ROKU_DEVICE_HOST` / `ROKU_DEVICE_PASSWORD` env vars (also read from a project-local `.env`).
-3. SSDP auto-discovery — only resolves `host`. Password must still come from #1 or #2.
+1. The `host` tool parameter (use it whenever the user gave you a specific LAN device).
+2. The `rceDevice` tool parameter.
+3. The `ROKU_RCE_DEVICE` environment variable.
+4. The `ROKU_DEVICE_HOST` environment variable, or its aliases `ROKU_IP`, `ROKU_HOST` and `ROKU_DEV_TARGET` (also read from a project-local `.env`).
+5. SSDP auto-discovery on the LAN, which resolves the host only.
 
-If a tool returns "Could not resolve the Roku device hostname" or "developer password is required", surface the missing piece to the user; do not invent an IP or password.
+The password comes from the `password` parameter first. For a Cloud Device it then falls back to `ROKU_RCE_PASSWORD` and then to `ROKU_DEVICE_PASSWORD`; for a LAN device it falls back to `ROKU_DEVICE_PASSWORD` (or its aliases `ROKU_DEV_PASSWORD` and `ROKU_PASSWORD`) and never reads `ROKU_RCE_PASSWORD`.
+
+If a tool returns "Could not resolve the Roku device hostname", "No Roku device found" or "developer password is required", surface the missing piece to the user; do not invent an IP address, a Cloud Device or a password.
+
+## Roku Cloud Emulator (RCE)
+
+Roku Cloud Emulator runs Roku devices in the cloud. RCE calls them Cloud Devices, and each boot of a Cloud Device is a Run. Using RCE requires `ROKU_RCE_TOKEN` in the server's environment.
+
+**A Run costs $0.20 per hour, billed per minute from the start request, and RCE never stops an idle Run.** Start a Run only when the user asked for a Cloud Device, keep `maxRuntimeMinutes` as low as the task allows, and always call `roku_rce_stop` when the work is done, even after a failure.
+
+Workflow:
+
+1. `roku_rce_list_devices` to find the Cloud Device and check that it has no Run.
+2. `roku_rce_status` to see its Snapshots, the Run state and the cost so far.
+3. `roku_rce_start rceDevice=<id> [snapshotId=<id>] [maxRuntimeMinutes=<n>]`. It waits until the device takes input and refuses a device that already has a Run.
+4. The usual tools with `rceDevice=<id>` (or with `ROKU_RCE_DEVICE` set): `roku_deploy`, `roku_console_capture_start`, `roku_console_wait`, `roku_keypress`, `roku_screenshot`, and so on.
+5. `roku_rce_stop rceDevice=<id>`, then confirm `shutdown` with `roku_rce_status`.
+
+What to expect on a Cloud Device:
+
+- Device info, the active app, key presses, deploy, delete, screenshots and the console (through an RCE bridge to port 8085) work.
+- In the default "Limited" ECP mode, `roku_query_app_ui`, `roku_query_sg_nodes`, `roku_find_node`, `roku_get_focused_node` and `roku_query_media_player` fail with a 403. Tell the user the fix from the error: Settings > System > Advanced system settings > Control by mobile apps > Network access > Permissive, then save a new Snapshot and start from it.
+- The runtime UI editing tools try an RCE bridge to port 9000. This path is unverified; a closed-port error means the channel has no RTA or RCE does not bridge port 9000.
+- `roku_perfetto_enable`, `roku_perfetto_start`, `roku_discover` and `roku_diagnose_stream` with `captureLive` are not supported and say so.
+- Never create or delete Cloud Devices; no tool does that.
 
 ## The canonical loop
 
@@ -68,7 +95,24 @@ roku_screenshot                       # optional pixel-level verify
 - Always pause between key presses with `roku_sleep` (500–2000 ms). Without it, the UI may not be settled when you `roku_find_node`.
 - For text fields: first focus with `roku_keypress` (or RTA `roku_focus_node`), then `roku_type_text`.
 - For video tests: `roku_query_media_player` is the source of truth (state ∈ {play, pause, buffer, stop, none}, plus `position`, `duration`, `error`).
-- `roku_console_send` and `roku_console_read` **auto-disconnect** after each call; don't expect a persistent debugger session.
+- `roku_console_connect` opens a connection for **one** `roku_console_read` or `roku_console_send` call, which then closes it; there is no persistent debugger session. To stream the console or wait for a log line, use the console capture tools below.
+
+## Console capture (record to file, wait for a line)
+
+Use when you need the console in a file or must wait for a specific log line (e.g. an HTTP request the app makes on startup):
+
+```
+roku_console_capture_start file=<project>/logs/<ts>-rokuDevice.log   # optional; defaults to ./logs/
+roku_deploy rootDir=<project>/dist        # guaranteed cold start
+#   or roku_launch appId=dev restart=true  # resumes instead if the channel uses sdk_instant_resume
+roku_console_wait pattern="<regex>" [predicate=jwtValid] [timeoutMs=120000]
+roku_console_capture_stop
+```
+
+- Port 8085 accepts **one client**. Detach the VS Code BrightScript debugger first. While a capture is active, `roku_console_connect` is refused, and `roku_console_read` and `roku_console_send` point you to `roku_console_wait` and the capture file.
+- `roku_console_wait` returns `{matched, lineNumber, timestamp, preview}` with tokens redacted. Read the full line from the capture file, never paste raw console output into chat.
+- `reason: "waiting_for_debugger"` means the channel was sideloaded by the VS Code debugger and is blocked on port 8081: redeploy with `roku_deploy`.
+- `reason: "timeout"` after `roku_launch restart=true`: the channel probably instant-resumed (no startup code ran). Use `roku_deploy` for a cold start.
 
 ## Runtime UI editing — required reading
 
@@ -120,7 +164,7 @@ When asked to deploy a workspace:
 ## Profiler & tracing
 
 - `.bsprof` (BrightScript Profiler) requires `bs_prof_enabled=true` in the channel's `manifest`. The file is downloadable from `http://<device-ip>:8080`. `analyze_bsprof` supports modes `memory|cpu|full|summary`; pair with `compare_bsprof` for regression detection.
-- Perfetto needs Roku OS 15.1+. Order is strict: `roku_perfetto_enable` → relaunch channel → `roku_perfetto_start` → interact with the app → `roku_perfetto_stop` → `analyze_perfetto` (modes `summary|frame-drops|key-events|observers|rendezvous|set-fields|threads`). `.trace` files also open in [ui.perfetto.dev](https://ui.perfetto.dev).
+- Perfetto needs Roku OS 15.1+ on a LAN device (it is not supported on Roku Cloud Emulator). Order is strict: `roku_perfetto_enable` → relaunch channel → `roku_perfetto_start` → interact with the app → `roku_perfetto_stop` → `analyze_perfetto` (modes `summary|frame-drops|key-events|observers|rendezvous|set-fields|threads`). `.trace` files also open in [ui.perfetto.dev](https://ui.perfetto.dev).
 - Use `query_perfetto` for custom PerfettoSQL when the canned modes don't answer the question.
 
 ## Test generation
@@ -135,7 +179,7 @@ When the user asks for an end-to-end test:
 ## What NOT to do
 
 - Don't repeatedly screenshot inside a single tight loop — one screenshot per significant UI change is enough.
-- Don't open multiple debug-console sessions; each `roku_console_send`/`read` opens, runs, and closes.
+- Don't open multiple debug-console sessions: port 8085 takes one client, and each `roku_console_connect` serves exactly one `roku_console_read` or `roku_console_send`.
 - Don't pass `nodeId: "<some name attribute>"` to edit-UI tools and call it done without a `roku_get_value` readback.
 - Don't mutate fields on RowList row children expecting them to stick — change the underlying `ContentNode` instead.
 - Don't assume Perfetto works on Roku OS <15.1 — fall back to `.bsprof` instead.

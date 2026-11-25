@@ -1,7 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import net from 'net';
-import { resolveHost, friendlyError } from '../roku-config.js';
+import type { Duplex } from 'stream';
+import { RceError } from 'roku-rce';
+import { DESTRUCTIVE, READ_ONLY, WRITES, friendlyError, resolveTarget as resolveDevice, targetParams, type RokuTarget } from '../roku-config.js';
 
 /**
  * Edit a running SceneGraph UI at runtime using the roku-test-automation (RTA)
@@ -45,6 +46,21 @@ const RTA_SETUP_HINT =
   '`\' vscode_rdb_on_device_component_entry` immediately after `screen.show()` inside `main()`. ' +
   'A successful install logs `[RTA][INFO] OnDeviceComponent init` at channel launch.';
 
+const RCE_PORT_9000 =
+  'Port 9000 did not answer through the Roku Cloud Emulator bridge (RCE answered with a closed-port status). ' +
+  'Either the running channel does not include the RTA On-Device Component, or RCE does not bridge port 9000 ' +
+  '(RCE documents bridges for 8080, 8081, 8082, 8085, 8087, 9999 and 49152-65535). This path is unverified on RCE.';
+
+/** One error text for every edit-UI tool; RCE closed-port errors get their own explanation. */
+function rtaFailure(prefix: string, error: unknown): string {
+  if (error instanceof RceError && error.code === 'port_closed') return `${prefix}: ${RCE_PORT_9000}`;
+  return `${prefix}: ${friendlyError(error)}${RTA_SETUP_HINT}`;
+}
+
+const EDIT_UI_RULE =
+  ' Address nodes by their uiElementId (RTA_<digits>) from roku_query_app_ui; a name attribute is not addressable and returns OK while changing nothing. ' +
+  'Verify every change with roku_get_value: OK alone is not proof. On a Roku Cloud Emulator device port 9000 is reached through an RCE bridge, which is unverified.';
+
 type Base = 'global' | 'scene' | 'elementId' | 'focusedNode' | 'nodeRef' | 'appUI';
 type FieldValue = string | number | boolean | number[];
 
@@ -64,13 +80,13 @@ interface PendingRequest {
 const HEADER_SIZE = 8;
 
 class RtaClient {
-  private socket: net.Socket;
+  private socket: Duplex;
   private connected = false;
   private pending = new Map<string, PendingRequest>();
   private incoming: { stringLength: number; binaryLength: number; stringPayload: string; binaryReceived: number } | null = null;
   private leftover: Buffer = Buffer.alloc(0);
 
-  private constructor(socket: net.Socket) {
+  private constructor(socket: Duplex) {
     this.socket = socket;
     socket.on('data', (chunk: Buffer | string) => this.onData(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
     socket.on('close', () => {
@@ -84,31 +100,18 @@ class RtaClient {
     socket.on('error', () => { /* swallow; close handler handles cleanup */ });
   }
 
-  static connect(host: string, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<RtaClient> {
-    return new Promise((resolve, reject) => {
-      const socket = new net.Socket();
-      const timer = setTimeout(() => {
-        socket.destroy();
-        reject(new Error(`Timed out connecting to RTA on ${host}:${RTA_PORT}`));
-      }, timeoutMs);
-      socket.once('error', (err) => {
-        clearTimeout(timer);
-        reject(err);
-      });
-      socket.connect(RTA_PORT, host, async () => {
-        clearTimeout(timer);
-        const client = new RtaClient(socket);
-        client.connected = true;
-        try {
-          // Handshake: the RTA OnDeviceComponent expects an initial setSettings call.
-          await client.send('setSettings', { logLevel: 'info' });
-          resolve(client);
-        } catch (err) {
-          socket.destroy();
-          reject(err);
-        }
-      });
-    });
+  static async connect(target: RokuTarget, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<RtaClient> {
+    const socket = await target.connect(RTA_PORT, timeoutMs);
+    const client = new RtaClient(socket);
+    client.connected = true;
+    try {
+      // Handshake: the RTA OnDeviceComponent expects an initial setSettings call.
+      await client.send('setSettings', { logLevel: 'info' });
+      return client;
+    } catch (err) {
+      socket.destroy();
+      throw err;
+    }
   }
 
   close(): void {
@@ -213,8 +216,8 @@ async function resolveTarget(client: RtaClient, nodeId: string): Promise<{ base:
   return { base: 'scene', keyPath: nodeId };
 }
 
-async function withClient<T>(host: string, fn: (client: RtaClient) => Promise<T>): Promise<T> {
-  const client = await RtaClient.connect(host);
+async function withClient<T>(target: RokuTarget, fn: (client: RtaClient) => Promise<T>): Promise<T> {
+  const client = await RtaClient.connect(target);
   try {
     return await fn(client);
   } finally {
@@ -273,14 +276,16 @@ export function registerEditUiTools(server: McpServer): void {
   server.registerTool(
     'roku_edit_node',
     {
+      title: 'Edit node fields',
+      annotations: WRITES,
       description:
         'Edit a SceneGraph node on the running dev channel at runtime by setting one or more fields. ' +
         'Uses the roku-test-automation (RTA) On-Device Component on TCP port 9000 — the same backend the SceneGraph Inspector in the vscode-brightscript-language extension uses. ' +
         'Requires RTA to be present in the running channel (see README "Runtime UI Editing"). ' +
         'nodeId can be either a `uiElementId` like "RTA_1773" (as shown by roku_query_sg_nodes) or a BrightScript scene-level `id`. ' +
-        'Common fields: visible (boolean), translation ([x,y]), text (string), color (hex like "0xRRGGBBAA"), opacity (number 0..1).',
+        'Common fields: visible (boolean), translation ([x,y]), text (string), color (hex like "0xRRGGBBAA"), opacity (number 0..1).' + EDIT_UI_RULE,
       inputSchema: {
-        host: z.string().optional().describe('IP address or hostname of the Roku device'),
+        ...targetParams,
         nodeId: z.string().describe('uiElementId (e.g. "RTA_1773") or BrightScript scene id of the node to edit'),
         fields: z
           .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.number())]))
@@ -289,13 +294,13 @@ export function registerEditUiTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const host = await resolveHost(params);
+        const device = await resolveDevice(params);
         const entries = Object.entries(params.fields ?? {});
         if (entries.length === 0) {
           return { content: [{ type: 'text', text: 'No fields provided.' }], isError: true };
         }
 
-        const { lines, anyError } = await withClient(host, async (client) => {
+        const { lines, anyError } = await withClient(device, async (client) => {
           const target = await resolveTarget(client, params.nodeId);
           const out: string[] = [];
           let err = false;
@@ -314,7 +319,7 @@ export function registerEditUiTools(server: McpServer): void {
         };
       } catch (error) {
         return {
-          content: [{ type: 'text', text: `Edit node failed: ${friendlyError(error)}${RTA_SETUP_HINT}` }],
+          content: [{ type: 'text', text: rtaFailure('Edit node failed', error) }],
           isError: true,
         };
       }
@@ -324,17 +329,19 @@ export function registerEditUiTools(server: McpServer): void {
   server.registerTool(
     'roku_set_node_visible',
     {
-      description: 'Show or hide a SceneGraph node by id via RTA setValue on the `visible` field.',
+      title: 'Set node visibility',
+      annotations: WRITES,
+      description: 'Show or hide a SceneGraph node by id via RTA setValue on the `visible` field.' + EDIT_UI_RULE,
       inputSchema: {
-        host: z.string().optional().describe('IP address or hostname of the Roku device'),
+        ...targetParams,
         nodeId: z.string().describe('uiElementId (e.g. "RTA_1773") or BrightScript scene id of the node'),
         visible: z.boolean().describe('true to show, false to hide'),
       },
     },
     async (params) => {
       try {
-        const host = await resolveHost(params);
-        const json = await withClient(host, async (client) => {
+        const device = await resolveDevice(params);
+        const json = await withClient(device, async (client) => {
           const target = await resolveTarget(client, params.nodeId);
           return client.send('setValue', buildSetValueArgs(target, 'visible', params.visible));
         });
@@ -344,7 +351,7 @@ export function registerEditUiTools(server: McpServer): void {
         };
       } catch (error) {
         return {
-          content: [{ type: 'text', text: `Set visible failed: ${friendlyError(error)}${RTA_SETUP_HINT}` }],
+          content: [{ type: 'text', text: rtaFailure('Set visible failed', error) }],
           isError: true,
         };
       }
@@ -354,9 +361,11 @@ export function registerEditUiTools(server: McpServer): void {
   server.registerTool(
     'roku_move_node',
     {
-      description: 'Move a SceneGraph node to a new position by setting its `translation` field to [x, y].',
+      title: 'Move node',
+      annotations: WRITES,
+      description: 'Move a SceneGraph node to a new position by setting its `translation` field to [x, y].' + EDIT_UI_RULE,
       inputSchema: {
-        host: z.string().optional().describe('IP address or hostname of the Roku device'),
+        ...targetParams,
         nodeId: z.string().describe('uiElementId or scene id of the node to move'),
         x: z.number().describe('Target x coordinate in pixels'),
         y: z.number().describe('Target y coordinate in pixels'),
@@ -364,8 +373,8 @@ export function registerEditUiTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const host = await resolveHost(params);
-        const json = await withClient(host, async (client) => {
+        const device = await resolveDevice(params);
+        const json = await withClient(device, async (client) => {
           const target = await resolveTarget(client, params.nodeId);
           return client.send('setValue', buildSetValueArgs(target, 'translation', [params.x, params.y]));
         });
@@ -375,7 +384,7 @@ export function registerEditUiTools(server: McpServer): void {
         };
       } catch (error) {
         return {
-          content: [{ type: 'text', text: `Move node failed: ${friendlyError(error)}${RTA_SETUP_HINT}` }],
+          content: [{ type: 'text', text: rtaFailure('Move node failed', error) }],
           isError: true,
         };
       }
@@ -385,17 +394,19 @@ export function registerEditUiTools(server: McpServer): void {
   server.registerTool(
     'roku_focus_node',
     {
-      description: 'Set focus on a SceneGraph node by id via RTA focusNode.',
+      title: 'Focus node',
+      annotations: WRITES,
+      description: 'Set focus on a SceneGraph node by id via RTA focusNode.' + EDIT_UI_RULE,
       inputSchema: {
-        host: z.string().optional().describe('IP address or hostname of the Roku device'),
+        ...targetParams,
         nodeId: z.string().describe('uiElementId or scene id of the node to focus'),
         on: z.boolean().optional().describe('true to set focus (default), false to remove'),
       },
     },
     async (params) => {
       try {
-        const host = await resolveHost(params);
-        const json = await withClient(host, async (client) => {
+        const device = await resolveDevice(params);
+        const json = await withClient(device, async (client) => {
           const target = await resolveTarget(client, params.nodeId);
           return client.send('focusNode', {
             base: target.base,
@@ -409,7 +420,7 @@ export function registerEditUiTools(server: McpServer): void {
         };
       } catch (error) {
         return {
-          content: [{ type: 'text', text: `Focus node failed: ${friendlyError(error)}${RTA_SETUP_HINT}` }],
+          content: [{ type: 'text', text: rtaFailure('Focus node failed', error) }],
           isError: true,
         };
       }
@@ -419,16 +430,18 @@ export function registerEditUiTools(server: McpServer): void {
   server.registerTool(
     'roku_remove_node',
     {
-      description: 'Remove a SceneGraph node from its parent at runtime via RTA removeNode.',
+      title: 'Remove node',
+      annotations: DESTRUCTIVE,
+      description: 'Remove a SceneGraph node from its parent at runtime via RTA removeNode.' + EDIT_UI_RULE,
       inputSchema: {
-        host: z.string().optional().describe('IP address or hostname of the Roku device'),
+        ...targetParams,
         nodeId: z.string().describe('uiElementId or scene id of the node to remove'),
       },
     },
     async (params) => {
       try {
-        const host = await resolveHost(params);
-        const json = await withClient(host, async (client) => {
+        const device = await resolveDevice(params);
+        const json = await withClient(device, async (client) => {
           const target = await resolveTarget(client, params.nodeId);
           return client.send('removeNode', {
             base: target.base,
@@ -441,7 +454,7 @@ export function registerEditUiTools(server: McpServer): void {
         };
       } catch (error) {
         return {
-          content: [{ type: 'text', text: `Remove node failed: ${friendlyError(error)}${RTA_SETUP_HINT}` }],
+          content: [{ type: 'text', text: rtaFailure('Remove node failed', error) }],
           isError: true,
         };
       }
@@ -451,11 +464,13 @@ export function registerEditUiTools(server: McpServer): void {
   server.registerTool(
     'roku_create_node',
     {
+      title: 'Create node',
+      annotations: WRITES,
       description:
         'Create a new SceneGraph node at runtime and append it as a child of an existing node via RTA createChild. ' +
-        'Subtype must be a SceneGraph node type registered for the running scene (e.g. Label, Rectangle, Poster, Group).',
+        'Subtype must be a SceneGraph node type registered for the running scene (e.g. Label, Rectangle, Poster, Group).' + EDIT_UI_RULE,
       inputSchema: {
-        host: z.string().optional().describe('IP address or hostname of the Roku device'),
+        ...targetParams,
         parentId: z.string().describe('uiElementId or scene id of the parent node'),
         subtype: z.string().describe('SceneGraph subtype to create (Label, Rectangle, Poster, Group, ...)'),
         id: z.string().optional().describe('Optional id to set on the new node'),
@@ -467,8 +482,8 @@ export function registerEditUiTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const host = await resolveHost(params);
-        const json = await withClient(host, async (client) => {
+        const device = await resolveDevice(params);
+        const json = await withClient(device, async (client) => {
           const target = await resolveTarget(client, params.parentId);
           const fields = { ...(params.fields ?? {}) };
           if (params.id) fields.id = params.id;
@@ -485,7 +500,7 @@ export function registerEditUiTools(server: McpServer): void {
         };
       } catch (error) {
         return {
-          content: [{ type: 'text', text: `Create node failed: ${friendlyError(error)}${RTA_SETUP_HINT}` }],
+          content: [{ type: 'text', text: rtaFailure('Create node failed', error) }],
           isError: true,
         };
       }
@@ -495,11 +510,13 @@ export function registerEditUiTools(server: McpServer): void {
   server.registerTool(
     'roku_get_value',
     {
+      title: 'Get node field value',
+      annotations: READ_ONLY,
       description:
         'Read a field value from a SceneGraph node at runtime via RTA getValue. Returns the value as JSON. ' +
-        'Pass either nodeId+field, or a full keyPath like "MainScene.rowList.0.title".',
+        'Pass either nodeId+field, or a full keyPath like "MainScene.rowList.0.title".' + EDIT_UI_RULE,
       inputSchema: {
-        host: z.string().optional().describe('IP address or hostname of the Roku device'),
+        ...targetParams,
         nodeId: z.string().optional().describe('uiElementId or scene id of the node (combined with `field`)'),
         field: z.string().optional().describe('Field name on the node (used with nodeId)'),
         keyPath: z.string().optional().describe('Full RTA keyPath instead of nodeId+field (e.g. "MainScene.rowList.focusedRow.title.text")'),
@@ -508,11 +525,11 @@ export function registerEditUiTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const host = await resolveHost(params);
+        const device = await resolveDevice(params);
         if (!params.keyPath && !(params.nodeId && params.field)) {
           return { content: [{ type: 'text', text: 'Provide either `keyPath` or both `nodeId` and `field`.' }], isError: true };
         }
-        const json = await withClient(host, async (client) => {
+        const json = await withClient(device, async (client) => {
           let args: Record<string, unknown>;
           if (params.keyPath) {
             args = { base: params.base ?? 'scene', keyPath: params.keyPath };
@@ -534,7 +551,7 @@ export function registerEditUiTools(server: McpServer): void {
         return { content: [{ type: 'text', text: JSON.stringify(json, null, 2) }], isError: isRtaError(json) || undefined };
       } catch (error) {
         return {
-          content: [{ type: 'text', text: `Get value failed: ${friendlyError(error)}${RTA_SETUP_HINT}` }],
+          content: [{ type: 'text', text: rtaFailure('Get value failed', error) }],
           isError: true,
         };
       }
@@ -544,11 +561,13 @@ export function registerEditUiTools(server: McpServer): void {
   server.registerTool(
     'roku_observe_field',
     {
+      title: 'Observe node field',
+      annotations: READ_ONLY,
       description:
         'Wait for a SceneGraph field to change (or match a specific value) via RTA onFieldChangeOnce. ' +
-        'Returns when the observer fires or the timeout elapses. Great for "wait until video starts playing" style assertions.',
+        'Returns when the observer fires or the timeout elapses. Great for "wait until video starts playing" style assertions.' + EDIT_UI_RULE,
       inputSchema: {
-        host: z.string().optional().describe('IP address or hostname of the Roku device'),
+        ...targetParams,
         nodeId: z.string().optional().describe('uiElementId or scene id of the node'),
         keyPath: z.string().optional().describe('Full RTA keyPath (alternative to nodeId+field)'),
         field: z.string().optional().describe('Field name to observe (used with nodeId)'),
@@ -561,12 +580,12 @@ export function registerEditUiTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const host = await resolveHost(params);
+        const device = await resolveDevice(params);
         if (!params.keyPath && !(params.nodeId && params.field)) {
           return { content: [{ type: 'text', text: 'Provide either `keyPath` or both `nodeId` and `field`.' }], isError: true };
         }
         const timeoutMs = params.timeoutMs ?? 10_000;
-        const json = await withClient(host, async (client) => {
+        const json = await withClient(device, async (client) => {
           let baseArgs: Record<string, unknown>;
           if (params.keyPath) {
             baseArgs = { base: 'scene', keyPath: params.keyPath };
@@ -589,7 +608,7 @@ export function registerEditUiTools(server: McpServer): void {
         return { content: [{ type: 'text', text: JSON.stringify(json, null, 2) }], isError: isRtaError(json) || undefined };
       } catch (error) {
         return {
-          content: [{ type: 'text', text: `Observe field failed: ${friendlyError(error)}${RTA_SETUP_HINT}` }],
+          content: [{ type: 'text', text: rtaFailure('Observe field failed', error) }],
           isError: true,
         };
       }

@@ -1,6 +1,6 @@
 # roku-mcp
 
-A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server for Roku device automation. Exposes tools for app deployment, ECP remote control, screenshot capture, SceneGraph node inspection, and BrightScript debug console access.
+A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server for Roku device automation. Exposes tools for app deployment, ECP remote control, screenshot capture, SceneGraph node inspection, BrightScript debug console access, profiling, and stream diagnosis. It drives Roku devices on your local network and, since 1.9.0, [Roku Cloud Emulator (RCE)](#roku-cloud-emulator-rce) Cloud Devices.
 
 ## Install
 
@@ -20,7 +20,7 @@ The repo also ships as a plugin: the MCP server, workflow skills (`skills/`), an
 - **Claude Code:** `/plugin marketplace add jack1590/RokuMCP` then `/plugin install roku-mcp@roku-mcp-marketplace`. Manifests: `.claude-plugin/`, `.mcp.json`.
 - **Cursor:** manifests in `.cursor-plugin/` and `mcp.json`. Skills in `skills/`, rules in `rules/cursor/`.
 
-Claude Code asks for the device host and developer password when the plugin is enabled (the password is stored as sensitive). Both clients use the entry point `bootstrap.mjs`. Both run `npm ci` and `npm run build` on first start (Node 18+). Outside plugin mode, `ROKU_DEVICE_HOST` / `ROKU_DEVICE_PASSWORD` or a project `.env` still work.
+Claude Code asks for the device host and developer password when the plugin is enabled (the password is stored as sensitive). It also offers optional Roku Cloud Emulator settings: `ROKU_RCE_TOKEN` and `ROKU_RCE_PASSWORD` (both stored as sensitive) and `ROKU_RCE_DEVICE`. Both clients use the entry point `bootstrap.mjs`. Both run `npm ci` and `npm run build` on first start (Node 18+). Outside plugin mode, `ROKU_DEVICE_HOST` / `ROKU_DEVICE_PASSWORD` or a project `.env` still work.
 
 Configure your AI client below. Every platform uses the same launch line; only the config file and reload step change.
 
@@ -213,36 +213,80 @@ The agent will `roku_query_app_ui` to locate the node, grab the `uiElementId`, c
 
 ## Environment Variables
 
-| Variable | Description |
-|---|---|
-| `ROKU_DEVICE_HOST` | IP address or hostname of the Roku device |
-| `ROKU_DEVICE_PASSWORD` | Developer password for the Roku device |
+| Variable | Aliases (checked in order, canonical first) | Description |
+|---|---|---|
+| `ROKU_DEVICE_HOST` | `ROKU_IP`, `ROKU_HOST`, `ROKU_DEV_TARGET` | IP address or hostname of the Roku device |
+| `ROKU_DEVICE_PASSWORD` | `ROKU_DEV_PASSWORD`, `ROKU_PASSWORD` | Developer password for the Roku device |
+| `ROKU_RCE_TOKEN` | none | Roku Cloud Emulator personal access token. Required for any RCE use; see [Roku Cloud Emulator (RCE)](#roku-cloud-emulator-rce) |
+| `ROKU_RCE_DEVICE` | none | Default RCE Cloud Device, by id or exact name |
+| `ROKU_RCE_PASSWORD` | none | Developer password of the RCE Cloud Device |
+| `ROKU_MCP_ENV_FILE` | none | Absolute path to an extra `.env` file to load (see below) |
 
-Both can also be passed as parameters on each tool call, which override the environment variables.
+Device-facing tools accept a `host` parameter and an `rceDevice` parameter, which override the environment variables. `roku_deploy`, `roku_delete_dev_channel`, `roku_screenshot` and `roku_diagnose_stream` (for `captureLive`) also accept `password`. The target is chosen in this order: the `host` parameter, then the `rceDevice` parameter, then `ROKU_RCE_DEVICE`, then `ROKU_DEVICE_HOST` (or its aliases, including values from `.env`), then SSDP discovery.
 
 ### Auto-discovery
 
-If `ROKU_DEVICE_HOST` is not set and no `host` parameter is provided, the server automatically discovers Roku devices on the local network using SSDP and uses the first one found. You can also use the `roku_discover` tool to list all available devices. Note that the password cannot be discovered and must still be configured.
+If no host is configured and no `host` parameter is provided, the server discovers Roku devices on the local network using SSDP and uses the first one found. You can also use the `roku_discover` tool to list all available devices. The password cannot be discovered and must still be configured.
 
 ### `.env` file support
 
-The server automatically loads a `.env` file from the current working directory using [dotenv](https://www.npmjs.com/package/dotenv). If your project's `.env` already uses `ROKU_DEVICE_HOST` and `ROKU_DEVICE_PASSWORD`, the server picks them up with no extra configuration — just omit the `env` block from your MCP config:
+The server loads a `.env` file from **its working directory** using [dotenv](https://www.npmjs.com/package/dotenv). The canonical names and the aliases above are all recognised, so an existing project `.env` such as
 
 ```
-ROKU_DEVICE_HOST=192.168.1.100
-ROKU_DEVICE_PASSWORD=my-password
+ROKU_IP=192.168.1.100
+ROKU_DEV_PASSWORD=my-password
 ```
 
-If your project uses different variable names (e.g. `ROKU_IP`, `ROKU_DEV_PASSWORD`), you can map them in the `env` block:
+works unchanged. Do not map variables in the MCP `env` block (`"ROKU_DEVICE_HOST": "${ROKU_IP}"`): MCP clients do not expand variables from a `.env` file there. Omit the `env` block and make sure the server starts in the project folder:
 
-```json
-"env": {
-  "ROKU_DEVICE_HOST": "${ROKU_IP}",
-  "ROKU_DEVICE_PASSWORD": "${ROKU_DEV_PASSWORD}"
-}
-```
+- **VS Code** (`.vscode/mcp.json`): stdio servers accept `cwd` (defaults to the workspace folder) and `envFile`, e.g. `"cwd": "${workspaceFolder}"` or `"envFile": "${workspaceFolder}/.env"`.
+- **Other clients** (Cursor, Claude Desktop, Windsurf, ...): project-level configs usually start the server in the project folder. If your client does not, set `ROKU_MCP_ENV_FILE` to the absolute path of the env file in the `env` block.
 
-Or simply add the two expected variables to your `.env` alongside your existing ones.
+Empty `ROKU_*` values are ignored, so a blank value from a client config does not hide the `.env`.
+
+## Roku Cloud Emulator (RCE)
+
+[Roku Cloud Emulator](https://developer.roku.com/) runs Roku devices in the cloud. RCE calls them Cloud Devices, and each boot of a Cloud Device is a Run. roku-mcp drives a running Cloud Device with the same tools it uses for a LAN device, through the [roku-rce](https://www.npmjs.com/package/roku-rce) library.
+
+> **Billing warning.** A Run costs **$0.20 per hour**, billed per minute from the moment the start is requested. RCE never stops an idle Run: only the maximum runtime cap ends it (`roku_rce_start` sets it to 60 minutes unless you pass `maxRuntimeMinutes`). Always call `roku_rce_stop` when you are done. When the server shuts down (stdin closes, or it receives SIGINT, SIGTERM or SIGHUP), it tries to stop every Run it started, but MCP clients may kill the process about four seconds after closing stdin, so do not rely on that.
+
+### Configuration
+
+| Variable | Description |
+|---|---|
+| `ROKU_RCE_TOKEN` | Your RCE personal access token. Required for every RCE tool and for any tool call that targets a Cloud Device. |
+| `ROKU_RCE_DEVICE` | Optional default Cloud Device id or exact name. When it is set, device tools target that Cloud Device unless a `host` parameter is passed. |
+| `ROKU_RCE_PASSWORD` | The Cloud Device developer password, used by `roku_deploy`, `roku_delete_dev_channel` and `roku_screenshot`. |
+
+For a Cloud Device, the password is taken from the `password` parameter, then `ROKU_RCE_PASSWORD`, then `ROKU_DEVICE_PASSWORD` (or its aliases). A LAN device never uses `ROKU_RCE_PASSWORD`.
+
+The token never appears in tool results, logs or error messages. roku-rce sends it only over HTTPS or secure WebSockets to `rce.roku.com` hosts on port 443, never follows redirects, and never routes requests through an HTTP proxy from the environment (such as `HTTPS_PROXY`), so a debugging proxy never sees it.
+
+### Workflow
+
+1. `roku_rce_list_devices` lists your Cloud Devices with their status and any current Run.
+2. `roku_rce_status` shows one Cloud Device: its Run, the cost so far, the auto-stop time, whether this server started the Run, and its Snapshots.
+3. `roku_rce_start` starts a Run (optionally from a `snapshotId`) and waits until the device takes input, which takes about 35 to 50 seconds. It refuses a Cloud Device that already has a Run. The call can block for up to about 5 minutes, so set your client's tool timeout above that.
+4. Use the usual tools with `rceDevice` (or with `ROKU_RCE_DEVICE` set), for example `roku_deploy`, `roku_console_capture_start`, `roku_keypress` and `roku_screenshot`.
+5. `roku_rce_stop` stops the Run and waits until the device reports shutdown. Confirm with `roku_rce_status`.
+
+No tool creates or deletes Cloud Devices.
+
+When the stdio server shuts down (stdin closes, or SIGINT, SIGTERM or SIGHUP), it stops, on a best-effort basis, every Run it started, including one whose start is still in flight. This cleanup covers the stdio entry only: a host that embeds `createServer()` with another transport must stop Runs itself (`roku_rce_stop`), or they bill until their max runtime.
+
+### What works on a Cloud Device
+
+RCE Cloud Devices start with "Control by mobile apps" set to **Limited**, and in that mode the device refuses most ECP commands with HTTP 403. To lift it, on the Cloud Device go to Settings > System > Advanced system settings > Control by mobile apps > Network access > Permissive, then save a new Snapshot and start from it.
+
+| Status | Tools |
+|---|---|
+| Works (verified on RCE firmware 16.0.4) | `roku_rce_*`, `roku_query_device_info`, `roku_query_active_app`, `roku_keypress`, `roku_deploy`, `roku_delete_dev_channel`, `roku_screenshot`, `roku_console_capture_start`, `roku_console_wait`, `roku_console_capture_stop`, `roku_console_capture_status` |
+| Works through the same paths, not separately verified | `roku_keypress_sequence`, `roku_type_text`, `roku_launch`, `roku_console_connect`, `roku_console_read`, `roku_console_send`, `roku_console_disconnect` |
+| Needs the Permissive setting (403 in Limited mode; the error explains the fix) | `roku_query_app_ui`, `roku_query_sg_nodes`, `roku_find_node`, `roku_get_focused_node`, `roku_query_media_player` |
+| Unverified | The runtime UI editing tools (`roku_edit_node`, `roku_set_node_visible`, `roku_move_node`, `roku_focus_node`, `roku_remove_node`, `roku_create_node`, `roku_get_value`, `roku_observe_field`). They try an RCE bridge to port 9000. Without RTA in the channel, RCE answered 502 and the tools report that port 9000 is closed. Whether RCE bridges port 9000 when RTA is present has not been tested. |
+| Not supported (the tool returns an error naming the alternative) | `roku_perfetto_enable`, `roku_perfetto_start` (roku-perfetto needs direct access to the device), `roku_discover` (LAN only; use `roku_rce_list_devices`), `roku_diagnose_stream` with `captureLive` |
+
+Tools that only read local files (`analyze_*`, `compare_*`, `query_perfetto`, `bsprof_info`, `roku_perfetto_stop`, `roku_sleep`, and `roku_diagnose_stream` without `captureLive`) do not depend on the device.
 
 ## Available Tools
 
@@ -250,14 +294,25 @@ Or simply add the two expected variables to your `.env` alongside your existing 
 
 | Tool | Description |
 |---|---|
-| `roku_deploy` | Sideload (deploy) a Roku app to the device. Stages in a temp folder (`stagingDir` overrides) so a project `bsconfig.json` can't make it wipe `rootDir` |
+| `roku_deploy` | Sideload a Roku app; replaces the installed dev channel and cold-starts it. Stages in a temp folder (`stagingDir` overrides) so a project `bsconfig.json` can't make it wipe `rootDir` |
 | `roku_delete_dev_channel` | Delete the currently sideloaded developer channel |
 
 ### Discovery
 
 | Tool | Description |
 |---|---|
-| `roku_discover` | Scan the local network for Roku devices via SSDP |
+| `roku_discover` | Scan the local network for Roku devices via SSDP (LAN only) |
+
+### Roku Cloud Emulator
+
+Every RCE tool other than the list and status tools affects billing: a Run costs $0.20 per hour from the start request until it is stopped.
+
+| Tool | Description |
+|---|---|
+| `roku_rce_list_devices` | List the Cloud Devices of the account, with status and any current Run |
+| `roku_rce_start` | Start a Run (billed) and wait until it takes input; refuses a device that already has a Run |
+| `roku_rce_stop` | Stop the current Run and wait for shutdown |
+| `roku_rce_status` | Run state, cost so far, auto-stop time, whether this server started the Run, and Snapshots |
 
 ### ECP (External Control Protocol)
 
@@ -265,16 +320,16 @@ Or simply add the two expected variables to your `.env` alongside your existing 
 |---|---|
 | `roku_keypress` | Send a single key press (Home, Select, Up, Down, Left, Right, Back, etc.) |
 | `roku_keypress_sequence` | Send multiple key presses in sequence with configurable delay |
-| `roku_type_text` | Type a text string into the focused field (e.g. email, password, search) |
+| `roku_type_text` | Type a text string into the focused field (e.g. email, password, search). The result reports only the character count |
 | `roku_launch` | Launch or deep-link into a channel (`restart: true` exits it first) |
 | `roku_query_device_info` | Get device model, firmware, serial number, network info |
 | `roku_query_active_app` | Get the currently running app |
 | `roku_query_media_player` | Get media player state (play/pause/buffer/stop), position, and duration |
 | `roku_query_app_ui` | Get the current app UI tree as XML |
 | `roku_query_sg_nodes` | Query SceneGraph nodes (all, roots, or by node ID) |
-| `roku_find_node` | Search the UI tree for a node by ID or attribute (subtype, text, etc.) |
+| `roku_find_node` | Search the UI tree for a node whose id or name matches `nodeId`, or by any attribute (subtype, text, etc.) |
 | `roku_get_focused_node` | Get the currently focused node with all its properties |
-| `roku_sleep` | Wait for a specified duration (useful between navigation steps) |
+| `roku_sleep` | Wait for a specified duration, clamped to 30000 ms (useful between navigation steps) |
 
 ### Screenshot
 
@@ -286,14 +341,16 @@ Or simply add the two expected variables to your `.env` alongside your existing 
 
 | Tool | Description |
 |---|---|
-| `roku_console_connect` | Open a TCP connection to the BrightScript debug console (port 8085) |
-| `roku_console_read` | Read buffered console output and auto-disconnect |
-| `roku_console_send` | Send a command to the debug console and auto-disconnect |
+| `roku_console_connect` | Open a connection to the BrightScript debug console (port 8085) for one follow-up `roku_console_read` or `roku_console_send` call |
+| `roku_console_read` | Read the output buffered since the connect, then disconnect (single-shot) |
+| `roku_console_send` | Send one command, return the output received within 500 ms, then disconnect (single-shot) |
 | `roku_console_disconnect` | Close the console connection (safety net) |
 | `roku_console_capture_start` | Keep port 8085 open and record the console to a file (skips the previous session's replay; default `./logs/<timestamp>-rokuDevice.log`) |
 | `roku_console_wait` | Wait for a captured line matching a regex; optional `predicate: "jwtValid"`. Returns line number, timestamp and a redacted preview, never the raw console |
 | `roku_console_capture_stop` | Stop the capture and close the file |
 | `roku_console_capture_status` | Report whether a capture is active, its file and size |
+
+The single-shot tools are not for streaming: to record the console or wait for a log line, use the capture tools. While a capture is active it holds port 8085, so `roku_console_read` and `roku_console_send` point you to `roku_console_wait` and the capture file instead.
 
 ### Runtime UI Editing
 
@@ -377,7 +434,7 @@ Record, analyze, and compare Perfetto traces from Roku devices. Requires **Roku 
 | `compare_perfetto` | Compare two .trace files to detect performance regressions and improvements |
 | `query_perfetto` | Run a raw PerfettoSQL query against a trace file for custom analysis |
 
-Workflow: enable tracing → start recording → interact with app → stop recording → analyze. The `.trace` files can also be opened at [ui.perfetto.dev](https://ui.perfetto.dev/).
+Workflow: enable tracing → relaunch the channel → start recording → interact with app → stop recording → analyze. Perfetto recording needs a LAN device; it is not supported on Roku Cloud Emulator. The `.trace` files can also be opened at [ui.perfetto.dev](https://ui.perfetto.dev/).
 
 ### Stream Diagnosis
 
@@ -389,10 +446,12 @@ Figure out why an HLS/DASH stream that plays everywhere else fails on Roku.
 
 It detects Roku-specific gotchas such as muxed audio+video in fMP4/CMAF HLS (plays video but silent), video codecs/levels beyond the hardware decoder (e.g. 4K H.264 or 8K HEVC), token/403-gated CDNs, and DRM license rejections. The static manifest checks are treated as hints; when you supply the real device `errorInfo` the diagnosis is corroborated to high confidence.
 
+HAR exports from an HTTP proxy such as [roxy](https://github.com/oscarsanchez/roxy) can be passed as `charlesSessionPath`, because the tool accepts `.har` files as well as Charles `.chlsj` files.
+
 ## Requirements
 
 - Node.js 18+
-- A Roku device with [Developer Mode](https://developer.roku.com/docs/developer-program/getting-started/developer-setup.md) enabled on the same network
+- A Roku device with [Developer Mode](https://developer.roku.com/docs/developer-program/getting-started/developer-setup.md) enabled on the same network, or a Roku Cloud Emulator account (`ROKU_RCE_TOKEN`) with a Cloud Device
 - For screenshots and deploy: a sideloaded dev channel must be running
 
 ## License
