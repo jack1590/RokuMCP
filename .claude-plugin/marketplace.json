@@ -10,11 +10,18 @@
   "plugins": [
     {
       "name": "roku-mcp",
-      "source": "./",
+      "source": "./plugin",
       "description": "Roku app automation, profiling, and stream diagnosis for LAN dev devices and Roku Cloud Emulator.",
       "version": "1.9.0",
       "category": "tools",
-      "tags": ["roku", "brightscript", "ecp", "mcp", "automation", "profiling"],
+      "tags": [
+        "roku",
+        "brightscript",
+        "ecp",
+        "mcp",
+        "automation",
+        "profiling"
+      ],
       "strict": false
     }
   ]

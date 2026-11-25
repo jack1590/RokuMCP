@@ -5,7 +5,7 @@
   "author": {
     "name": "jack1590"
   },
-  "skills": "./skills",
+  "skills": "./plugin/skills",
   "rules": "./rules/cursor",
   "homepage": "https://github.com/jack1590/RokuMCP#readme",
   "repository": "https://github.com/jack1590/RokuMCP",

@@ -39,5 +39,6 @@
       "description": "Optional. Developer password of the Cloud Device (used for deploy, delete and screenshot).",
       "sensitive": true
     }
-  }
+  },
+  "privacyPolicyUrl": "https://github.com/jack1590/RokuMCP#privacy"
 }

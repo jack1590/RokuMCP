@@ -1,8 +1,11 @@
 {
   "mcpServers": {
     "roku": {
-      "command": "node",
-      "args": ["${CURSOR_PLUGIN_ROOT}/bootstrap.mjs"]
+      "command": "npx",
+      "args": [
+        "-y",
+        "roku-mcp@1.9.0"
+      ]
     }
   }
 }

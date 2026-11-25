@@ -15,12 +15,14 @@ npm install -g roku-mcp     # optional, global install
 
 > Unofficial community tool. Not affiliated with or endorsed by Roku, Inc.
 
-The repo also ships as a plugin: the MCP server, workflow skills (`skills/`), and Cursor rules, registered together.
+The repo also ships as a plugin: the MCP server, workflow skills, and Cursor rules, registered together.
 
-- **Claude Code:** `/plugin marketplace add jack1590/RokuMCP` then `/plugin install roku-mcp@roku-mcp-marketplace`. Manifests: `.claude-plugin/`, `.mcp.json`.
-- **Cursor:** manifests in `.cursor-plugin/` and `mcp.json`. Skills in `skills/`, rules in `rules/cursor/`.
+- **Claude Code:** `/plugin marketplace add jack1590/RokuMCP` then `/plugin install roku-mcp@roku-mcp-marketplace`. The plugin lives in the `plugin/` folder: `plugin/.claude-plugin/plugin.json`, `plugin/.mcp.json` and `plugin/skills/`.
+- **Cursor:** manifests in `.cursor-plugin/` and `mcp.json`. Skills in `plugin/skills/`, rules in `rules/cursor/`.
 
-Claude Code asks for the device host and developer password when the plugin is enabled (the password is stored as sensitive). It also offers optional Roku Cloud Emulator settings: `ROKU_RCE_TOKEN` and `ROKU_RCE_PASSWORD` (both stored as sensitive) and `ROKU_RCE_DEVICE`. Both clients use the entry point `bootstrap.mjs`. Both run `npm ci` and `npm run build` on first start (Node 18+). Outside plugin mode, `ROKU_DEVICE_HOST` / `ROKU_DEVICE_PASSWORD` or a project `.env` still work.
+Claude Code asks for the device host and developer password when the plugin is enabled (the password is stored as sensitive). It also offers optional Roku Cloud Emulator settings: `ROKU_RCE_TOKEN` and `ROKU_RCE_PASSWORD` (both stored as sensitive) and `ROKU_RCE_DEVICE`.
+
+Both clients start the server with `npx -y roku-mcp@<version>`, pinned to the exact release that matches the plugin. The plugin folder contains no `package.json` and installs nothing itself: `npx` downloads that one published version from the npm registry on first start (Node 18+ and network access to registry.npmjs.org are required). On native Windows, if the client cannot start `npx` directly, use the manual configuration below with `"command": "cmd"` and `"args": ["/c", "npx", "-y", "roku-mcp"]`. Outside plugin mode, `ROKU_DEVICE_HOST` / `ROKU_DEVICE_PASSWORD` or a project `.env` still work.
 
 Configure your AI client below. Every platform uses the same launch line; only the config file and reload step change.
 
@@ -453,6 +455,17 @@ HAR exports from an HTTP proxy such as [roxy](https://github.com/oscarsanchez/ro
 - Node.js 18+
 - A Roku device with [Developer Mode](https://developer.roku.com/docs/developer-program/getting-started/developer-setup.md) enabled on the same network, or a Roku Cloud Emulator account (`ROKU_RCE_TOKEN`) with a Cloud Device
 - For screenshots and deploy: a sideloaded dev channel must be running
+
+## Privacy
+
+The server runs on your machine and has no telemetry or analytics. It sends data only to:
+
+- the Roku device you target on your local network (ECP, the developer web server, the debug console and the RTA port);
+- Roku Cloud Emulator (`https://api.rce.roku.com` and `*.rce.roku.com`), only when you use a Cloud Device, authenticated with the token you provide;
+- stream URLs that you pass to `roku_diagnose_stream`, to fetch the manifest;
+- the npm registry, when `npx` downloads the server.
+
+Device passwords and the Cloud Emulator token are read from the plugin settings, tool parameters or your environment, are used only for those requests, and are never written to tool output or log files. Screenshots, console captures and traces are saved to local files that you choose. Nothing is collected or retained by the author.
 
 ## License
 

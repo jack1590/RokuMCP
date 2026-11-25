@@ -18,7 +18,7 @@ Run `/reload-plugins`. The server is registered as `roku`.
 
 Cursor: add the repo as a plugin marketplace (`.cursor-plugin/marketplace.json`) or copy it to `~/.cursor/plugins/local/roku-mcp/`.
 
-First launch runs `npm ci` and `npm run build` (needs Node 18+). Output goes to stderr.
+The plugin starts the server with `npx -y roku-mcp@<version>`, pinned to the release that matches the plugin. The first launch downloads that version from the npm registry (needs Node 18+ and network access).
 
 ## Device credentials
 

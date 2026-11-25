@@ -2,6 +2,11 @@
 
 ## [1.9.0] - 2026-11-25
 
+### Changed
+- Plugin layout: the Claude Code plugin now lives in `plugin/` (`plugin/.claude-plugin/plugin.json`, `plugin/.mcp.json`, `plugin/skills/`, its own README and LICENSE), with no `package.json` or lockfile in the plugin folder. The marketplace entry points to `./plugin`. Cursor reads skills from `plugin/skills/`.
+- Plugin launch: Claude Code and Cursor start the server with `npx -y roku-mcp@1.9.0` (exact version). `bootstrap.mjs` is removed, so the plugin no longer runs `npm ci` and a build on first start.
+- README: new Privacy section. Added a `LICENSE` file (MIT).
+
 ### Added
 - Roku Cloud Emulator (RCE) support through the `roku-rce` library. Every device-facing tool accepts an optional `rceDevice` parameter (a Cloud Device id or exact name), and the new `ROKU_RCE_DEVICE` variable sets a default. The target precedence is: `host` parameter, then `rceDevice` parameter, then `ROKU_RCE_DEVICE`, then the host environment variables, then SSDP discovery.
 - New environment variables: `ROKU_RCE_TOKEN` (required for any RCE use), `ROKU_RCE_DEVICE` and `ROKU_RCE_PASSWORD` (the Cloud Device developer password). They are also offered as optional plugin settings in `.claude-plugin/plugin.json`.
