@@ -1,50 +1,16 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { runCost, type RceDevice } from 'roku-rce';
-import { DESTRUCTIVE, READ_ONLY, friendlyError } from '../roku-config.js';
-import { RCE_BILLING, rceCore } from '../rce.js';
-
-type ToolResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
+import { DESTRUCTIVE, READ_ONLY } from '../roku-config.js';
+import { RCE_BILLING } from '../rce.js';
+import * as sdk from '../sdk/index.js';
+import { errorText, fail, failure, ok, type ToolResult } from './result.js';
 
 const deviceParam = z
   .string()
   .optional()
   .describe('Cloud Device id or exact name. Defaults to ROKU_RCE_DEVICE.');
 
-const ok = (value: unknown): ToolResult => ({ content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] });
-const fail = (text: string): ToolResult => ({ content: [{ type: 'text', text }], isError: true });
-
-function deviceRef(param?: string): string {
-  const ref = param || process.env.ROKU_RCE_DEVICE;
-  if (!ref) throw new Error('No Cloud Device given. Pass rceDevice (an id or exact name from roku_rce_list_devices) or set ROKU_RCE_DEVICE.');
-  return ref;
-}
-
-function runSummary(device: RceDevice) {
-  const run = device.running_device;
-  if (!run || device.status === 'shutdown') return null;
-  return {
-    runId: run.id,
-    status: device.status,
-    snapshotId: run.snapshot_id,
-    snapshotName: run.snapshot_name ?? null,
-    createdAt: run.created_at,
-    startedByThisServer: rceCore().startedHere(device),
-    ...runCost(run),
-  };
-}
-
-function deviceSummary(device: RceDevice) {
-  return {
-    id: device.id,
-    name: device.name,
-    deviceType: device.device_type,
-    status: device.status,
-    firmware: device.firmware_version_display_name ?? device.firmware_version_id ?? null,
-    lastSnapshot: device.last_snapshot_id ? { id: device.last_snapshot_id, name: device.last_snapshot_name ?? null } : null,
-    run: runSummary(device),
-  };
-}
+const json = (value: unknown): ToolResult => ok(JSON.stringify(value, null, 2));
 
 export function registerRceTools(server: McpServer): void {
   server.registerTool(
@@ -58,9 +24,9 @@ export function registerRceTools(server: McpServer): void {
     },
     async (): Promise<ToolResult> => {
       try {
-        return ok((await rceCore().listDevices()).map(deviceSummary));
+        return json(await sdk.listCloudDevices());
       } catch (error) {
-        return fail(`List Cloud Devices failed: ${friendlyError(error)}`);
+        return fail('List Cloud Devices failed', error);
       }
     }
   );
@@ -90,27 +56,9 @@ export function registerRceTools(server: McpServer): void {
     },
     async (params): Promise<ToolResult> => {
       try {
-        const core = rceCore();
-        const device = await core.findDevice(deviceRef(params.rceDevice));
-        if (device.status !== 'shutdown') {
-          return fail(
-            `Cloud Device ${device.id} (${device.name}) already has a Run (status ${device.status}). Nothing was started. ` +
-              'Inspect it with roku_rce_status, or end it with roku_rce_stop.'
-          );
-        }
-        const minutes = params.maxRuntimeMinutes ?? 60;
-        await core.start(device.id, { snapshotId: params.snapshotId, maxRuntime: minutes * 60 });
-        try {
-          const ready = await core.waitUntilReady(device.id, { timeoutMs: 240_000 });
-          return ok({ started: true, device: deviceSummary(ready), billing: RCE_BILLING });
-        } catch (error) {
-          return fail(
-            `The Run on Cloud Device ${device.id} was started and is billing, but it did not become ready: ${friendlyError(error)}. ` +
-              'Check it with roku_rce_status, and end it with roku_rce_stop if you do not need it.'
-          );
-        }
+        return json(await sdk.cloudStart(params));
       } catch (error) {
-        return fail(`Start Run failed: ${friendlyError(error)}`);
+        return fail('Start Run failed', error);
       }
     }
   );
@@ -129,15 +77,9 @@ export function registerRceTools(server: McpServer): void {
     },
     async (params): Promise<ToolResult> => {
       try {
-        const core = rceCore();
-        const device = await core.findDevice(deviceRef(params.rceDevice));
-        const run = runSummary(device);
-        if (!run) return ok({ stopped: false, message: `Cloud Device ${device.id} (${device.name}) has no Run.`, device: deviceSummary(device) });
-        await core.stop(device.id, { runId: run.runId });
-        const after = await core.waitUntilShutdown(device.id, { timeoutMs: 240_000 });
-        return ok({ stopped: true, runId: run.runId, startedByThisServer: run.startedByThisServer, billedMinutesAtStop: run.billedMinutes, costUsdAtStop: run.costUsd, device: deviceSummary(after) });
+        return json(await sdk.cloudStop(params));
       } catch (error) {
-        return fail(`Stop Run failed: ${friendlyError(error)}. Check the device with roku_rce_status: a Run that is still up keeps billing.`);
+        return failure(`${errorText('Stop Run failed', error)}. Check the device with roku_rce_status: a Run that is still up keeps billing.`);
       }
     }
   );
@@ -154,12 +96,9 @@ export function registerRceTools(server: McpServer): void {
     },
     async (params): Promise<ToolResult> => {
       try {
-        const core = rceCore();
-        const device = await core.findDevice(deviceRef(params.rceDevice));
-        const snapshots = (await core.listSnapshots(device.id)).map((s) => ({ id: s.id, name: s.name, createdAt: s.created_at, ready: s.ready, live: s.live, base: s.base }));
-        return ok({ ...deviceSummary(device), snapshots });
+        return json(await sdk.cloudStatus(params));
       } catch (error) {
-        return fail(`Cloud Device status failed: ${friendlyError(error)}`);
+        return fail('Cloud Device status failed', error);
       }
     }
   );

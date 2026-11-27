@@ -18,7 +18,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { parseBsprof, buildHeaderInfo } from 'bsprof-cli';
-import { readHeaderInfo, getProfile } from '../src/tools/bsprof.js';
+import { readHeaderInfo, getProfile } from '../src/sdk/profiler.js';
 import { buildBsprof } from './helpers/bsprof-fixture.js';
 
 test('readHeaderInfo (header-only) matches a full parse on header fields', () => {

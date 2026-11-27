@@ -1,27 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import os from 'os';
-import path from 'path';
-import { PerfettoClient, RokuAnalyzer, comparePerfetto, openTrace } from 'roku-perfetto';
-import type { AnalysisMode } from 'roku-perfetto';
-import { READ_ONLY, WRITES, friendlyError, rceUnsupported, resolveTarget, targetParams, type TargetParams } from '../roku-config.js';
-
-function jsonify(value: unknown): string {
-  return JSON.stringify(value, (_k, v) => (typeof v === 'bigint' ? Number(v) : v), 2);
-}
-
-const PERFETTO_ALTERNATIVE =
-  'roku-perfetto talks to port 8060 and a plain WebSocket on the device directly, which RCE does not expose. Use a LAN Roku device (pass host), or profile with a .bsprof capture (analyze_bsprof).';
-
-/** Perfetto needs direct LAN access; returns the host or throws a one-line error for Cloud Devices. */
-async function lanHost(params: TargetParams, tool: string): Promise<string> {
-  const unsupported = rceUnsupported(params, tool, PERFETTO_ALTERNATIVE);
-  if (unsupported) throw new Error(unsupported);
-  return (await resolveTarget(params)).host!;
-}
-
-let client: PerfettoClient | null = null;
-let clientHost: string | null = null;
+import { READ_ONLY, WRITES, targetParams } from '../roku-config.js';
+import * as sdk from '../sdk/index.js';
+import { fail, jsonify, ok } from './result.js';
 
 export function registerPerfettoTools(server: McpServer): void {
   // ---------------------------------------------------------------------------
@@ -45,18 +26,9 @@ export function registerPerfettoTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const host = await lanHost(params, 'roku_perfetto_enable');
-        client = new PerfettoClient(host);
-        clientHost = host;
-        const result = await client.enable(params.channelId ?? 'dev');
-        return {
-          content: [{ type: 'text', text: jsonify(result) }],
-        };
+        return ok(jsonify(await sdk.perfettoEnable(params)));
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Enable failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Enable failed', error);
       }
     },
   );
@@ -80,28 +52,10 @@ export function registerPerfettoTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const host = await lanHost(params, 'roku_perfetto_start');
-        if (!client || clientHost !== host) {
-          client = new PerfettoClient(host);
-          clientHost = host;
-        }
-
-        const dir = params.outDir ?? os.tmpdir();
-        const name = params.outFile ?? `roku-perfetto-${Date.now()}`;
-        const filePath = path.join(dir, `${name}.trace`);
-
-        const session = await client.startRecording(filePath, params.channelId ?? 'dev');
-        return {
-          content: [{
-            type: 'text',
-            text: `Recording Perfetto trace on ${session.host} → ${session.filePath}\nUse roku_perfetto_stop to end recording.`,
-          }],
-        };
+        const session = await sdk.perfettoStart(params);
+        return ok(`Recording Perfetto trace on ${session.host} → ${session.filePath}\nUse roku_perfetto_stop to end recording.`);
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Start failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Start failed', error);
       }
     },
   );
@@ -119,25 +73,12 @@ export function registerPerfettoTools(server: McpServer): void {
     },
     async () => {
       try {
-        if (!client || !client.isRecording()) {
-          return {
-            content: [{ type: 'text', text: 'No active Perfetto recording. Use roku_perfetto_start first.' }],
-            isError: true,
-          };
-        }
-
-        const result = await client.stopRecording();
-        return {
-          content: [{
-            type: 'text',
-            text: `Perfetto trace saved: ${result.filePath}\nDuration: ${(result.durationMs / 1000).toFixed(1)}s | Size: ${(result.bytesWritten / 1024).toFixed(1)}KB\nOpen at: https://ui.perfetto.dev/\nOr analyze with: analyze_perfetto`,
-          }],
-        };
+        const result = await sdk.perfettoStop();
+        return ok(
+          `Perfetto trace saved: ${result.filePath}\nDuration: ${(result.durationMs / 1000).toFixed(1)}s | Size: ${(result.bytesWritten / 1024).toFixed(1)}KB\nOpen at: https://ui.perfetto.dev/\nOr analyze with: analyze_perfetto`
+        );
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Stop failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Stop failed', error);
       }
     },
   );
@@ -166,46 +107,9 @@ export function registerPerfettoTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const opts = { top: params.top ?? 20, threshold: params.threshold };
-        const analyzer = await openTrace(params.filePath);
-
-        let report: unknown;
-        try {
-          switch (params.mode as AnalysisMode) {
-            case 'summary':
-              report = await analyzer.performanceSummary(opts);
-              break;
-            case 'frame-drops':
-              report = await analyzer.analyzeFrameDrops(opts);
-              break;
-            case 'key-events':
-              report = await analyzer.analyzeKeyEvents(opts);
-              break;
-            case 'observers':
-              report = await analyzer.analyzeObservers(opts);
-              break;
-            case 'rendezvous':
-              report = await analyzer.analyzeRendezvous(opts);
-              break;
-            case 'set-fields':
-              report = await analyzer.analyzeSetFields(opts);
-              break;
-            case 'threads':
-              report = await analyzer.analyzeThreads(opts);
-              break;
-          }
-        } finally {
-          await analyzer.close();
-        }
-
-        return {
-          content: [{ type: 'text', text: jsonify(report) }],
-        };
+        return ok(jsonify(await sdk.analyzeTrace(params)));
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Analysis failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Analysis failed', error);
       }
     },
   );
@@ -228,17 +132,9 @@ export function registerPerfettoTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const report = await comparePerfetto(params.beforePath, params.afterPath, {
-          top: params.top ?? 20,
-        });
-        return {
-          content: [{ type: 'text', text: jsonify(report) }],
-        };
+        return ok(jsonify(await sdk.compareTraces(params)));
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Comparison failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Comparison failed', error);
       }
     },
   );
@@ -260,20 +156,9 @@ export function registerPerfettoTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const analyzer = await openTrace(params.filePath);
-        try {
-          const result = await analyzer.query(params.sql);
-          return {
-            content: [{ type: 'text', text: jsonify(result) }],
-          };
-        } finally {
-          await analyzer.close();
-        }
+        return ok(jsonify(await sdk.queryTrace(params)));
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Query failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Query failed', error);
       }
     },
   );

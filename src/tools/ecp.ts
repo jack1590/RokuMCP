@@ -1,12 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { XMLParser } from 'fast-xml-parser';
-import { ECP_TREE_TIMEOUT_MS, READ_ONLY, WRITES, friendlyError, resolveTarget, targetParams } from '../roku-config.js';
-import { discoverRokuDevices } from '../discovery.js';
-
-const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
-
-const NO_DEV_CHANNEL = 'No dev channel is running (the device answered 404 to query/app-ui). Deploy one with roku_deploy first.';
+import { READ_ONLY, WRITES, targetParams } from '../roku-config.js';
+import * as sdk from '../sdk/index.js';
+import { fail, ok } from './result.js';
 
 export function registerEcpTools(server: McpServer): void {
   server.registerTool(
@@ -21,21 +17,14 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const devices = await discoverRokuDevices(params.timeoutMs ?? 3000);
+        const devices = await sdk.discover({ timeoutMs: params.timeoutMs });
         if (devices.length === 0) {
-          return {
-            content: [{ type: 'text', text: 'No Roku devices found on the network. SSDP discovery covers the LAN only; for Roku Cloud Emulator devices use roku_rce_list_devices.' }],
-          };
+          return ok('No Roku devices found on the network. SSDP discovery covers the LAN only; for Roku Cloud Emulator devices use roku_rce_list_devices.');
         }
         const list = devices.map((d, i) => `${i + 1}. ${d.host} (${d.location})`).join('\n');
-        return {
-          content: [{ type: 'text', text: `Found ${devices.length} Roku device(s):\n${list}` }],
-        };
+        return ok(`Found ${devices.length} Roku device(s):\n${list}`);
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Discovery failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Discovery failed', error);
       }
     }
   );
@@ -53,16 +42,10 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const target = await resolveTarget(params);
-        await target.keypress(params.key);
-        return {
-          content: [{ type: 'text', text: `Key press sent: ${params.key}` }],
-        };
+        await sdk.keypress(params);
+        return ok(`Key press sent: ${params.key}`);
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Key press failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Key press failed', error);
       }
     }
   );
@@ -85,22 +68,10 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const target = await resolveTarget(params);
-        const delay = params.delayMs ?? 100;
-        for (const key of params.keys) {
-          await target.keypress(key);
-          if (delay > 0) {
-            await new Promise((r) => setTimeout(r, delay));
-          }
-        }
-        return {
-          content: [{ type: 'text', text: `Key sequence sent: ${params.keys.join(', ')}` }],
-        };
+        await sdk.keySequence(params);
+        return ok(`Key sequence sent: ${params.keys.join(', ')}`);
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Key sequence failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Key sequence failed', error);
       }
     }
   );
@@ -125,27 +96,12 @@ export function registerEcpTools(server: McpServer): void {
           .describe('Exit the app first (ECP exit-app, falling back to Home) and wait ~1.5s. Channels with sdk_instant_resume only suspend on exit and will resume, not cold-start; use roku_deploy for a guaranteed cold start'),
       },
     },
-    async (toolParams) => {
+    async (params) => {
       try {
-        const target = await resolveTarget(toolParams);
-        if (toolParams.restart) {
-          await target
-            .ecp(`exit-app/${encodeURIComponent(toolParams.appId)}`, { method: 'POST' })
-            .catch(() => target.keypress('Home'));
-          await new Promise((r) => setTimeout(r, 1500));
-        }
-        const queryString = toolParams.params
-          ? '?' + new URLSearchParams(toolParams.params as Record<string, string>).toString()
-          : '';
-        await target.ecp(`launch/${encodeURIComponent(toolParams.appId)}${queryString}`, { method: 'POST' });
-        return {
-          content: [{ type: 'text', text: `Launched app ${toolParams.appId} on ${target.label}` }],
-        };
+        const { appId, label } = await sdk.launch(params);
+        return ok(`Launched app ${appId} on ${label}`);
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Launch failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Launch failed', error);
       }
     }
   );
@@ -162,16 +118,9 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const target = await resolveTarget(params);
-        const parsed = xmlParser.parse(await target.ecp('query/device-info'));
-        return {
-          content: [{ type: 'text', text: JSON.stringify(parsed, null, 2) }],
-        };
+        return ok(JSON.stringify(await sdk.deviceInfo(params), null, 2));
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Query device info failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Query device info failed', error);
       }
     }
   );
@@ -188,16 +137,9 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const target = await resolveTarget(params);
-        const parsed = xmlParser.parse(await target.ecp('query/active-app'));
-        return {
-          content: [{ type: 'text', text: JSON.stringify(parsed, null, 2) }],
-        };
+        return ok(JSON.stringify(await sdk.activeApp(params), null, 2));
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Query active app failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Query active app failed', error);
       }
     }
   );
@@ -214,16 +156,9 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const target = await resolveTarget(params);
-        const xml = await target.ecp('query/app-ui', { timeoutMs: ECP_TREE_TIMEOUT_MS });
-        return {
-          content: [{ type: 'text', text: xml }],
-        };
+        return ok(await sdk.appUi(params));
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Query app UI failed: ${friendlyError(error, { notFound: NO_DEV_CHANNEL })}` }],
-          isError: true,
-        };
+        return fail('Query app UI failed', error);
       }
     }
   );
@@ -242,30 +177,9 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const target = await resolveTarget(params);
-        let path: string;
-
-        if (params.type === 'node') {
-          if (!params.nodeId) {
-            return {
-              content: [{ type: 'text', text: 'nodeId is required when type is "node"' }],
-              isError: true,
-            };
-          }
-          path = `query/sgnodes/nodes/${encodeURIComponent(params.nodeId)}`;
-        } else {
-          path = `query/sgnodes/${params.type}`;
-        }
-
-        const xml = await target.ecp(path, { timeoutMs: ECP_TREE_TIMEOUT_MS });
-        return {
-          content: [{ type: 'text', text: xml }],
-        };
+        return ok(await sdk.sgNodes(params));
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Query SG nodes failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Query SG nodes failed', error);
       }
     }
   );
@@ -288,22 +202,9 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const target = await resolveTarget(params);
-        const delay = params.delayMs ?? 50;
-        for (const char of params.text) {
-          await target.keypress('Lit_' + char);
-          if (delay > 0) {
-            await new Promise((r) => setTimeout(r, delay));
-          }
-        }
-        return {
-          content: [{ type: 'text', text: `Typed ${[...params.text].length} characters` }],
-        };
+        return ok(`Typed ${await sdk.typeText(params)} characters`);
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Type text failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Type text failed', error);
       }
     }
   );
@@ -320,16 +221,9 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const target = await resolveTarget(params);
-        const parsed = xmlParser.parse(await target.ecp('query/media-player'));
-        return {
-          content: [{ type: 'text', text: JSON.stringify(parsed, null, 2) }],
-        };
+        return ok(JSON.stringify(await sdk.mediaPlayer(params), null, 2));
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Query media player failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Query media player failed', error);
       }
     }
   );
@@ -349,65 +243,14 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        if (!params.nodeId && (!params.attr || !params.value)) {
-          return {
-            content: [{ type: 'text', text: 'Provide either nodeId, or both attr and value to search for a node.' }],
-            isError: true,
-          };
-        }
-        const target = await resolveTarget(params);
-        const parsed = xmlParser.parse(await target.ecp('query/app-ui', { timeoutMs: ECP_TREE_TIMEOUT_MS }));
-
-        const results: Record<string, unknown>[] = [];
-
-        function searchNode(node: unknown): void {
-          if (!node || typeof node !== 'object') return;
-          const n = node as Record<string, unknown>;
-
-          let match = false;
-          if (params.nodeId) {
-            match = n['@_id'] === params.nodeId || n['@_name'] === params.nodeId;
-          } else if (params.attr && params.value) {
-            const attrKey = params.attr.startsWith('@_') ? params.attr : `@_${params.attr}`;
-            match = String(n[attrKey] ?? '') === params.value;
-          }
-
-          if (match) {
-            const attrs: Record<string, unknown> = {};
-            for (const [k, v] of Object.entries(n)) {
-              if (k.startsWith('@_')) {
-                attrs[k.slice(2)] = v;
-              }
-            }
-            results.push(attrs);
-          }
-
-          for (const v of Object.values(n)) {
-            if (Array.isArray(v)) {
-              v.forEach(searchNode);
-            } else if (typeof v === 'object' && v !== null) {
-              searchNode(v);
-            }
-          }
-        }
-
-        searchNode(parsed);
-
+        const results = await sdk.findNode(params);
         if (results.length === 0) {
           const searchDesc = params.nodeId ? `id or name "${params.nodeId}"` : `${params.attr}="${params.value}"`;
-          return {
-            content: [{ type: 'text', text: `No node found with ${searchDesc} in the current UI tree.` }],
-          };
+          return ok(`No node found with ${searchDesc} in the current UI tree.`);
         }
-
-        return {
-          content: [{ type: 'text', text: JSON.stringify(results.length === 1 ? results[0] : results, null, 2) }],
-        };
+        return ok(JSON.stringify(results.length === 1 ? results[0] : results, null, 2));
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Find node failed: ${friendlyError(error, { notFound: NO_DEV_CHANNEL })}` }],
-          isError: true,
-        };
+        return fail('Find node failed', error);
       }
     }
   );
@@ -424,52 +267,10 @@ export function registerEcpTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const target = await resolveTarget(params);
-        const parsed = xmlParser.parse(await target.ecp('query/app-ui', { timeoutMs: ECP_TREE_TIMEOUT_MS }));
-
-        let focused: Record<string, unknown> | null = null;
-
-        function findFocused(node: unknown): void {
-          if (focused || !node || typeof node !== 'object') return;
-          const n = node as Record<string, unknown>;
-
-          if (n['@_focused'] === 'true' || n['@_focused'] === true) {
-            const attrs: Record<string, unknown> = {};
-            for (const [k, v] of Object.entries(n)) {
-              if (k.startsWith('@_')) {
-                attrs[k.slice(2)] = v;
-              }
-            }
-            focused = attrs;
-            return;
-          }
-
-          for (const v of Object.values(n)) {
-            if (focused) return;
-            if (Array.isArray(v)) {
-              v.forEach(findFocused);
-            } else if (typeof v === 'object' && v !== null) {
-              findFocused(v);
-            }
-          }
-        }
-
-        findFocused(parsed);
-
-        if (!focused) {
-          return {
-            content: [{ type: 'text', text: 'No focused node found in the current UI tree.' }],
-          };
-        }
-
-        return {
-          content: [{ type: 'text', text: JSON.stringify(focused, null, 2) }],
-        };
+        const focused = await sdk.focusedNode(params);
+        return ok(focused ? JSON.stringify(focused, null, 2) : 'No focused node found in the current UI tree.');
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Get focused node failed: ${friendlyError(error, { notFound: NO_DEV_CHANNEL })}` }],
-          isError: true,
-        };
+        return fail('Get focused node failed', error);
       }
     }
   );
@@ -484,12 +285,6 @@ export function registerEcpTools(server: McpServer): void {
         durationMs: z.number().describe('Duration to wait in milliseconds (e.g. 1000 for 1 second, 5000 for 5 seconds)'),
       },
     },
-    async (params) => {
-      const ms = Math.min(Math.max(params.durationMs, 0), 30_000);
-      await new Promise((r) => setTimeout(r, ms));
-      return {
-        content: [{ type: 'text', text: `Waited ${ms}ms` }],
-      };
-    }
+    async (params) => ok(`Waited ${await sdk.sleep(params)}ms`)
   );
 }

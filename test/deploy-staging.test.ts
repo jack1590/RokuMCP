@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { overlaps } from '../src/tools/deploy.js';
+import { overlaps } from '../src/sdk/deploy.js';
 
 test('deploy staging guard: rejects the same folder, either inside the other, and case variants', () => {
   assert.equal(overlaps('/p/app/dist', '/p/app/dist'), true);

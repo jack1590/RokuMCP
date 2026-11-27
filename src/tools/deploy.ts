@@ -1,20 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import fs from 'fs/promises';
-import path from 'path';
-import os from 'os';
-import { rokuDeploy } from 'roku-deploy';
-import { DESTRUCTIVE, friendlyError, passwordParam, resolveTarget, targetParams } from '../roku-config.js';
-
-/** Whether either folder is, or contains, the other. Case-insensitive, since macOS file systems usually are. */
-export function overlaps(a: string, b: string): boolean {
-  const [x, y] = [path.resolve(a).toLowerCase(), path.resolve(b).toLowerCase()];
-  const inside = (child: string, parent: string) => {
-    const rel = path.relative(parent, child);
-    return rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
-  };
-  return inside(x, y) || inside(y, x);
-}
+import { DESTRUCTIVE, passwordParam, targetParams } from '../roku-config.js';
+import * as sdk from '../sdk/index.js';
+import { fail, ok } from './result.js';
 
 export function registerDeployTools(server: McpServer): void {
   server.registerTool(
@@ -39,55 +27,11 @@ export function registerDeployTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const manifestPath = path.join(params.rootDir, 'manifest');
-        try {
-          await fs.access(manifestPath);
-        } catch {
-          return {
-            content: [{ type: 'text', text: `Deploy failed: No manifest file found at ${manifestPath}. The rootDir must point to the Roku project directory that contains the manifest file.` }],
-            isError: true,
-          };
-        }
-
-        const target = await resolveTarget(params, { needPassword: true });
-        const outDir = path.join(os.tmpdir(), 'roku-mcp-deploy');
-        // Explicit: otherwise roku-deploy picks stagingDir from a bsconfig.json/rokudeploy.json in cwd,
-        // and when that equals rootDir (e.g. "dist") it empties then deletes the build being deployed.
-        const stagingDir = path.resolve(params.stagingDir ?? path.join(os.tmpdir(), `roku-mcp-staging-${Date.now()}`));
-        if (overlaps(stagingDir, params.rootDir)) {
-          return {
-            content: [{ type: 'text', text: 'Deploy failed: stagingDir must not be rootDir, inside it, or contain it (roku-deploy empties and deletes it).' }],
-            isError: true,
-          };
-        }
-        const deployOptions = {
-          host: target.host,
-          password: target.password,
-          rootDir: params.rootDir,
-          outDir,
-          stagingDir,
-          files: params.files && params.files.length > 0 ? params.files : ['**/*'],
-          retainStagingDir: false,
-        };
-
-        if (target.rce) {
-          await rokuDeploy.createPackage(deployOptions);
-          const zipPath = rokuDeploy.getOutputZipFilePath(deployOptions);
-          const result = await target.rce.instance.install(await fs.readFile(zipPath), path.basename(zipPath));
-          const note = result.outcome === 'identical' ? ' (the device reported the package as identical to the installed one)' : '';
-          return {
-            content: [{ type: 'text', text: `Successfully deployed app from ${params.rootDir} to ${target.label}${note}` }],
-          };
-        }
-        await rokuDeploy.deploy(deployOptions);
-        return {
-          content: [{ type: 'text', text: `Successfully deployed app from ${params.rootDir} to ${target.label}` }],
-        };
+        const result = await sdk.deploy(params);
+        const note = result.identical ? ' (the device reported the package as identical to the installed one)' : '';
+        return ok(`Successfully deployed app from ${result.rootDir} to ${result.label}${note}`);
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Deploy failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Deploy failed', error);
       }
     }
   );
@@ -105,17 +49,10 @@ export function registerDeployTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const target = await resolveTarget(params, { needPassword: true });
-        if (target.rce) await target.rce.instance.deleteDevChannel();
-        else await rokuDeploy.deleteInstalledChannel({ host: target.host!, password: target.password! });
-        return {
-          content: [{ type: 'text', text: `Successfully deleted dev channel from ${target.label}` }],
-        };
+        const { label } = await sdk.deleteDevChannel(params);
+        return ok(`Successfully deleted dev channel from ${label}`);
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Delete dev channel failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Delete dev channel failed', error);
       }
     }
   );

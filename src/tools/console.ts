@@ -1,20 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { Duplex } from 'stream';
-import { READ_ONLY, WRITES, friendlyError, resolveTarget, targetParams } from '../roku-config.js';
-import { isCaptureActive } from './console-capture.js';
-
-interface ConsoleSession {
-  socket: Duplex;
-  buffer: string;
-  host: string;
-  connected: boolean;
-}
-
-let session: ConsoleSession | null = null;
-
-const CAPTURE_ACTIVE =
-  'A console capture is active and holds port 8085 (single client). Use roku_console_wait, or read the capture file; stop it with roku_console_capture_stop to use the single-shot console tools again.';
+import { READ_ONLY, WRITES, targetParams } from '../roku-config.js';
+import * as sdk from '../sdk/index.js';
+import { fail, ok } from './result.js';
 
 export function registerConsoleTools(server: McpServer): void {
   server.registerTool(
@@ -30,40 +18,11 @@ export function registerConsoleTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        if (isCaptureActive()) {
-          return {
-            content: [{ type: 'text', text: CAPTURE_ACTIVE }],
-            isError: true,
-          };
-        }
-        if (session?.connected) {
-          return {
-            content: [{ type: 'text', text: `Already connected to ${session.host}. Disconnect first to connect to a different device.` }],
-          };
-        }
-
-        const target = await resolveTarget(params);
-        const port = params.port ?? 8085;
-        const socket = await target.connect(port, 10_000);
-        const newSession: ConsoleSession = { socket, buffer: '', host: target.label, connected: true };
-        session = newSession;
-        socket.on('data', (data) => {
-          if (session === newSession) session.buffer += data.toString();
-        });
-        socket.on('close', () => {
-          if (session === newSession) session.connected = false;
-        });
-        socket.on('error', () => {
-          if (session === newSession) session.connected = false;
-        });
-        return {
-          content: [{ type: 'text', text: `Connected to BrightScript debug console at ${target.label}:${port}. The next roku_console_read or roku_console_send closes this connection.` }],
-        };
+        const result = await sdk.consoleConnect(params);
+        if ('alreadyConnected' in result) return ok(`Already connected to ${result.label}. Disconnect first to connect to a different device.`);
+        return ok(`Connected to BrightScript debug console at ${result.label}:${result.port}. The next roku_console_read or roku_console_send closes this connection.`);
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: `Console connect failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Console connect failed', error);
       }
     }
   );
@@ -76,30 +35,12 @@ export function registerConsoleTools(server: McpServer): void {
       description: 'Read the output buffered since roku_console_connect, then close the connection (single-shot: call roku_console_connect again before the next read). For streaming, use roku_console_capture_start and roku_console_wait.',
     },
     async () => {
-      if (!session?.connected) {
-        return {
-          content: [{ type: 'text', text: isCaptureActive() ? CAPTURE_ACTIVE : 'No active console connection. Use roku_console_connect first.' }],
-          isError: true,
-        };
+      try {
+        const { output, label } = await sdk.consoleRead();
+        return ok(output.length === 0 ? `(no new output) — disconnected from ${label}` : output + `\n\n--- disconnected from ${label} ---`);
+      } catch (error) {
+        return fail('Console read failed', error);
       }
-
-      await new Promise((r) => setTimeout(r, 200));
-
-      const output = session.buffer;
-      session.buffer = '';
-      const host = session.host;
-      session.socket.destroy();
-      session = null;
-
-      if (output.length === 0) {
-        return {
-          content: [{ type: 'text', text: `(no new output) — disconnected from ${host}` }],
-        };
-      }
-
-      return {
-        content: [{ type: 'text', text: output + `\n\n--- disconnected from ${host} ---` }],
-      };
     }
   );
 
@@ -114,45 +55,11 @@ export function registerConsoleTools(server: McpServer): void {
       },
     },
     async (params) => {
-      if (!session?.connected) {
-        return {
-          content: [{ type: 'text', text: isCaptureActive() ? CAPTURE_ACTIVE : 'No active console connection. Use roku_console_connect first.' }],
-          isError: true,
-        };
-      }
-
       try {
-        return await new Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }>((resolve) => {
-          session!.buffer = '';
-          session!.socket.write(params.command + '\r\n', (err) => {
-            if (err) {
-              const host = session?.host ?? 'unknown';
-              if (session) { session.socket.destroy(); session = null; }
-              resolve({
-                content: [{ type: 'text', text: `Failed to send command: ${err.message} — disconnected from ${host}` }],
-                isError: true,
-              });
-              return;
-            }
-
-            setTimeout(() => {
-              const output = session!.buffer;
-              session!.buffer = '';
-              const host = session!.host;
-              session!.socket.destroy();
-              session = null;
-              resolve({
-                content: [{ type: 'text', text: (output || '(command sent, no output received)') + `\n\n--- disconnected from ${host} ---` }],
-              });
-            }, 500);
-          });
-        });
+        const { output, label } = await sdk.consoleSend(params);
+        return ok((output || '(command sent, no output received)') + `\n\n--- disconnected from ${label} ---`);
       } catch (error) {
-        if (session) { session.socket.destroy(); session = null; }
-        return {
-          content: [{ type: 'text', text: `Console send failed: ${friendlyError(error)}` }],
-          isError: true,
-        };
+        return fail('Console send failed', error);
       }
     }
   );
@@ -165,19 +72,8 @@ export function registerConsoleTools(server: McpServer): void {
       description: 'Close the active BrightScript debug console connection.',
     },
     async () => {
-      if (!session) {
-        return {
-          content: [{ type: 'text', text: 'No active console connection to disconnect.' }],
-        };
-      }
-
-      const host = session.host;
-      session.socket.destroy();
-      session = null;
-
-      return {
-        content: [{ type: 'text', text: `Disconnected from ${host}` }],
-      };
+      const result = sdk.consoleDisconnect();
+      return ok(result ? `Disconnected from ${result.label}` : 'No active console connection to disconnect.');
     }
   );
 }

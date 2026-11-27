@@ -164,19 +164,22 @@ const PORT_SERVICES: Record<string, string> = {
   '9000': 'RTA On-Device Component, port 9000',
 };
 
+/** Whether the device answered 404 (ECP over HTTP on LAN, the Instance API on RCE). */
+export function isNotFound(error: unknown): boolean {
+  if (error instanceof RceError) return error.status === 404;
+  const raw = error instanceof Error ? error.message : String(error);
+  return (axios.isAxiosError(error) && error.response?.status === 404) || /status code 404/.test(raw);
+}
+
 export function friendlyError(error: unknown, options: { notFound?: string } = {}): string {
+  if (options.notFound && isNotFound(error)) return options.notFound;
   if (error instanceof RceError) {
     // roku-rce messages are written for people and never carry the token.
-    if (error.status === 404 && options.notFound) return options.notFound;
     if (error.code === 'not_running') return `${error.message}. Check it with roku_rce_status, or start a Run with roku_rce_start.`;
     return `${error.message}${error.code ? ` (RCE: ${error.code})` : ''}`;
   }
   const raw = error instanceof Error ? error.message : String(error);
   const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-
-  if (options.notFound && (status === 404 || /status code 404/.test(raw))) {
-    return options.notFound;
-  }
   if (status === 401 || /401|unauthorized/i.test(raw)) {
     return 'Authentication failed — the Roku developer password is incorrect. Please provide the correct password.';
   }

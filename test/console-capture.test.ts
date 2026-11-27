@@ -16,8 +16,8 @@ import {
   splitLines,
   hasValidJwt,
   redactedPreview,
-  registerConsoleCaptureTools,
-} from '../src/tools/console-capture.js';
+} from '../src/sdk/console.js';
+import { registerConsoleCaptureTools } from '../src/tools/console-capture.js';
 
 function jwt(exp: number): string {
   const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url');

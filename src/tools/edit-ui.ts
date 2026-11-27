@@ -1,231 +1,24 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { Duplex } from 'stream';
 import { RceError } from 'roku-rce';
-import { DESTRUCTIVE, READ_ONLY, WRITES, friendlyError, resolveTarget as resolveDevice, targetParams, type RokuTarget } from '../roku-config.js';
-
-/**
- * Edit a running SceneGraph UI at runtime using the roku-test-automation (RTA)
- * On-Device Component, the same backend the SceneGraph Inspector in the
- * rokucommunity/vscode-brightscript-language extension uses.
- *
- * The RTA OnDeviceComponent listens on TCP port 9000 inside the channel and
- * speaks a simple length-prefixed JSON protocol. Each message looks like:
- *
- *   [ int32LE stringLength ][ int32LE binaryLength ][ utf-8 JSON payload ][ optional binary ]
- *
- * Requests are `{ id, type, args, isRecuring }`; responses come framed the same
- * way and we correlate by `id`. See the upstream source at
- * https://github.com/triwav/roku-test-automation/blob/master/client/src/OnDeviceComponent.ts
- *
- * Requirements on the device:
- *   - The channel must include the RTA OnDeviceComponent (either bundled by the
- *     channel, or injected at sideload time by roku-debug via
- *     `"injectRdbOnDeviceComponent": true` in launch.json plus the marker
- *     comment `' vscode_rdb_on_device_component_entry` after `screen.show()`).
- *   - A successful install logs `[RTA][INFO] OnDeviceComponent init` at launch.
- *
- * Node addressing:
- *   - `base: 'elementId'` + `keyPath: <uiElementId>` — most robust, uses the
- *     `uiElementId="RTA_*"` shown by `roku_query_sg_nodes`.
- *   - `base: 'scene'` + `keyPath: 'someId'` — works when the node has a real
- *     `id` field set in the BrightScript code.
- *   - `base: 'focusedNode'` — no keyPath, targets whatever is currently focused.
- *
- * The mutating tools below accept `nodeId` and try elementId first, then fall
- * back to scene-keyPath for convenience.
- */
-
-const RTA_PORT = 9000;
-const DEFAULT_TIMEOUT_MS = 5000;
-
-const RTA_SETUP_HINT =
-  '\n\nThis tool talks to the roku-test-automation (RTA) On-Device Component on TCP port 9000. ' +
-  'If the connection is refused, the channel does not include RTA. To enable it, either bundle the RTA OnDeviceComponent in your channel ' +
-  'OR (when sideloading via roku-debug) set `"injectRdbOnDeviceComponent": true` in launch.json and add the marker comment ' +
-  '`\' vscode_rdb_on_device_component_entry` immediately after `screen.show()` inside `main()`. ' +
-  'A successful install logs `[RTA][INFO] OnDeviceComponent init` at channel launch.';
-
-const RCE_PORT_9000 =
-  'Port 9000 did not answer through the Roku Cloud Emulator bridge (RCE answered with a closed-port status). ' +
-  'Either the running channel does not include the RTA On-Device Component, or RCE does not bridge port 9000 ' +
-  '(RCE documents bridges for 8080, 8081, 8082, 8085, 8087, 9999 and 49152-65535). This path is unverified on RCE.';
+import { DESTRUCTIVE, READ_ONLY, WRITES, targetParams } from '../roku-config.js';
+import * as sdk from '../sdk/index.js';
+import { RCE_PORT_9000, RTA_SETUP_HINT, isRtaError, type RtaResponse } from '../sdk/rta.js';
+import { RokuError } from '../sdk/errors.js';
+import { errorText, failure, type ToolResult } from './result.js';
 
 /** One error text for every edit-UI tool; RCE closed-port errors get their own explanation. */
-function rtaFailure(prefix: string, error: unknown): string {
-  if (error instanceof RceError && error.code === 'port_closed') return `${prefix}: ${RCE_PORT_9000}`;
-  return `${prefix}: ${friendlyError(error)}${RTA_SETUP_HINT}`;
+function rtaFailure(prefix: string, error: unknown): ToolResult {
+  if (error instanceof RceError && error.code === 'port_closed') return failure(`${prefix}: ${RCE_PORT_9000}`);
+  if (error instanceof RokuError) return failure(errorText(prefix, error));
+  return failure(`${errorText(prefix, error)}${RTA_SETUP_HINT}`);
 }
 
 const EDIT_UI_RULE =
   ' Address nodes by their uiElementId (RTA_<digits>) from roku_query_app_ui; a name attribute is not addressable and returns OK while changing nothing. ' +
   'Verify every change with roku_get_value: OK alone is not proof. On a Roku Cloud Emulator device port 9000 is reached through an RCE bridge, which is unverified.';
 
-type Base = 'global' | 'scene' | 'elementId' | 'focusedNode' | 'nodeRef' | 'appUI';
-type FieldValue = string | number | boolean | number[];
-
-interface RtaRequest {
-  id: string;
-  type: string;
-  args: Record<string, unknown>;
-  isRecuring: boolean;
-}
-
-interface PendingRequest {
-  resolve: (json: any) => void;
-  reject: (err: Error) => void;
-  timer: NodeJS.Timeout;
-}
-
-const HEADER_SIZE = 8;
-
-class RtaClient {
-  private socket: Duplex;
-  private connected = false;
-  private pending = new Map<string, PendingRequest>();
-  private incoming: { stringLength: number; binaryLength: number; stringPayload: string; binaryReceived: number } | null = null;
-  private leftover: Buffer = Buffer.alloc(0);
-
-  private constructor(socket: Duplex) {
-    this.socket = socket;
-    socket.on('data', (chunk: Buffer | string) => this.onData(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
-    socket.on('close', () => {
-      this.connected = false;
-      for (const p of this.pending.values()) {
-        clearTimeout(p.timer);
-        p.reject(new Error('RTA socket closed before response was received'));
-      }
-      this.pending.clear();
-    });
-    socket.on('error', () => { /* swallow; close handler handles cleanup */ });
-  }
-
-  static async connect(target: RokuTarget, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<RtaClient> {
-    const socket = await target.connect(RTA_PORT, timeoutMs);
-    const client = new RtaClient(socket);
-    client.connected = true;
-    try {
-      // Handshake: the RTA OnDeviceComponent expects an initial setSettings call.
-      await client.send('setSettings', { logLevel: 'info' });
-      return client;
-    } catch (err) {
-      socket.destroy();
-      throw err;
-    }
-  }
-
-  close(): void {
-    try { this.socket.destroy(); } catch { /* ignore */ }
-    this.connected = false;
-  }
-
-  private onData(chunk: Buffer): void {
-    let buf = Buffer.concat([this.leftover, chunk]);
-    this.leftover = Buffer.alloc(0);
-
-    while (buf.length > 0) {
-      if (!this.incoming) {
-        if (buf.length < HEADER_SIZE) {
-          this.leftover = buf;
-          return;
-        }
-        this.incoming = {
-          stringLength: buf.readInt32LE(0),
-          binaryLength: buf.readInt32LE(4),
-          stringPayload: '',
-          binaryReceived: 0,
-        };
-        buf = buf.slice(HEADER_SIZE);
-      }
-
-      const needString = this.incoming.stringLength - Buffer.byteLength(this.incoming.stringPayload, 'utf-8');
-      if (needString > 0) {
-        const take = Math.min(needString, buf.length);
-        this.incoming.stringPayload += buf.slice(0, take).toString('utf-8');
-        buf = buf.slice(take);
-        if (Buffer.byteLength(this.incoming.stringPayload, 'utf-8') < this.incoming.stringLength) {
-          this.leftover = buf;
-          return;
-        }
-      }
-
-      const needBinary = this.incoming.binaryLength - this.incoming.binaryReceived;
-      if (needBinary > 0) {
-        const take = Math.min(needBinary, buf.length);
-        this.incoming.binaryReceived += take;
-        buf = buf.slice(take);
-        if (this.incoming.binaryReceived < this.incoming.binaryLength) {
-          this.leftover = buf;
-          return;
-        }
-      }
-
-      try {
-        const json = JSON.parse(this.incoming.stringPayload);
-        const id = json.id as string | undefined;
-        if (id && this.pending.has(id)) {
-          const p = this.pending.get(id)!;
-          this.pending.delete(id);
-          clearTimeout(p.timer);
-          p.resolve(json);
-        }
-      } catch {
-        // ignore malformed responses
-      }
-      this.incoming = null;
-    }
-  }
-
-  send(type: string, args: Record<string, unknown>, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<any> {
-    if (!this.connected) return Promise.reject(new Error('RTA client not connected'));
-    const id = Math.random().toString(36).slice(2, 14);
-    const request: RtaRequest = { id, type, args, isRecuring: false };
-    const stringPayload = JSON.stringify(request).replace(/[\x00-\x08\x0E-\x1F\x7F-\uFFFF]/g, '');
-    const header = Buffer.alloc(HEADER_SIZE);
-    header.writeInt32LE(Buffer.byteLength(stringPayload, 'utf-8'), 0);
-    header.writeInt32LE(0, 4);
-    const body = Buffer.from(stringPayload, 'utf-8');
-
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        reject(new Error(`RTA request \`${type}\` timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
-      this.pending.set(id, { resolve, reject, timer });
-      this.socket.write(Buffer.concat([header, body]), (err) => {
-        if (err) {
-          this.pending.delete(id);
-          clearTimeout(timer);
-          reject(err);
-        }
-      });
-    });
-  }
-}
-
-/**
- * Determine the best `base`/`keyPath` pair for a given user-supplied node
- * identifier. We try elementId first because it always works against the
- * `uiElementId="RTA_*"` ids RTA assigns to every node, then fall back to
- * scene-relative lookup so callers can pass a real BrightScript `id` too.
- */
-async function resolveTarget(client: RtaClient, nodeId: string): Promise<{ base: Base; keyPath?: string; sceneKeyPath?: string }> {
-  if (/^RTA_\d+$/i.test(nodeId)) {
-    return { base: 'elementId', keyPath: nodeId };
-  }
-  return { base: 'scene', keyPath: nodeId };
-}
-
-async function withClient<T>(target: RokuTarget, fn: (client: RtaClient) => Promise<T>): Promise<T> {
-  const client = await RtaClient.connect(target);
-  try {
-    return await fn(client);
-  } finally {
-    client.close();
-  }
-}
-
-function summarizeResponse(json: any): string {
+function summarizeResponse(json: RtaResponse): string {
   if (!json) return '(no response)';
   if (json.error) return `RTA error: ${typeof json.error === 'string' ? json.error : JSON.stringify(json.error)}`;
   const { id: _id, timeTaken: _t, ...rest } = json;
@@ -234,43 +27,10 @@ function summarizeResponse(json: any): string {
   return trimmed === '{}' ? 'OK' : trimmed;
 }
 
-function isRtaError(json: any): boolean {
-  return !!(json && json.error);
-}
-
-/**
- * Build the `setValue` args for a node+field pair, matching how the VS Code
- * SceneGraph Inspector formats requests.
- *
- * - When `base` is `elementId`, the `keyPath` must be the bare elementId and
- *   the field name goes in the separate `field` arg. Appending `.field` to
- *   the elementId makes the OnDeviceComponent treat the whole string as a
- *   non-existent elementId, so the write silently no-ops while still
- *   returning a 200-style response. (Verified against firmware behavior.)
- * - When `base` is `scene` (or any other base), the field name is the last
- *   segment of the dotted keyPath, e.g. `MainScene.subtitle.text`.
- */
-function buildSetValueArgs(
-  target: { base: Base; keyPath?: string },
-  field: string,
-  value: unknown
-): Record<string, unknown> {
-  if (target.base === 'elementId') {
-    return {
-      base: 'elementId',
-      keyPath: target.keyPath ?? '',
-      field,
-      value,
-    };
-  }
-  const keyPath = target.keyPath ? `${target.keyPath}.${field}` : field;
-  return {
-    base: target.base,
-    keyPath,
-    field,
-    value,
-  };
-}
+const rtaResult = (what: string, json: RtaResponse): ToolResult => ({
+  content: [{ type: 'text', text: `${what} -> ${summarizeResponse(json)}` }],
+  isError: isRtaError(json) || undefined,
+});
 
 export function registerEditUiTools(server: McpServer): void {
   server.registerTool(
@@ -294,34 +54,14 @@ export function registerEditUiTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const device = await resolveDevice(params);
-        const entries = Object.entries(params.fields ?? {});
-        if (entries.length === 0) {
-          return { content: [{ type: 'text', text: 'No fields provided.' }], isError: true };
-        }
-
-        const { lines, anyError } = await withClient(device, async (client) => {
-          const target = await resolveTarget(client, params.nodeId);
-          const out: string[] = [];
-          let err = false;
-          for (const [field, value] of entries) {
-            const args = buildSetValueArgs(target, field, value);
-            const json = await client.send('setValue', args);
-            if (isRtaError(json)) err = true;
-            out.push(`${field} = ${JSON.stringify(value)} -> ${summarizeResponse(json)}`);
-          }
-          return { lines: out, anyError: err };
-        });
-
+        const results = await sdk.editNode(params);
+        const lines = results.map((r) => `${r.field} = ${JSON.stringify(r.value)} -> ${summarizeResponse(r.response)}`);
         return {
           content: [{ type: 'text', text: `Updated node "${params.nodeId}":\n${lines.join('\n')}` }],
-          isError: anyError || undefined,
+          isError: results.some((r) => isRtaError(r.response)) || undefined,
         };
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: rtaFailure('Edit node failed', error) }],
-          isError: true,
-        };
+        return rtaFailure('Edit node failed', error);
       }
     }
   );
@@ -340,20 +80,9 @@ export function registerEditUiTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const device = await resolveDevice(params);
-        const json = await withClient(device, async (client) => {
-          const target = await resolveTarget(client, params.nodeId);
-          return client.send('setValue', buildSetValueArgs(target, 'visible', params.visible));
-        });
-        return {
-          content: [{ type: 'text', text: `${params.visible ? 'Showed' : 'Hid'} "${params.nodeId}" -> ${summarizeResponse(json)}` }],
-          isError: isRtaError(json) || undefined,
-        };
+        return rtaResult(`${params.visible ? 'Showed' : 'Hid'} "${params.nodeId}"`, await sdk.setNodeVisible(params));
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: rtaFailure('Set visible failed', error) }],
-          isError: true,
-        };
+        return rtaFailure('Set visible failed', error);
       }
     }
   );
@@ -373,20 +102,9 @@ export function registerEditUiTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const device = await resolveDevice(params);
-        const json = await withClient(device, async (client) => {
-          const target = await resolveTarget(client, params.nodeId);
-          return client.send('setValue', buildSetValueArgs(target, 'translation', [params.x, params.y]));
-        });
-        return {
-          content: [{ type: 'text', text: `Moved "${params.nodeId}" to [${params.x}, ${params.y}] -> ${summarizeResponse(json)}` }],
-          isError: isRtaError(json) || undefined,
-        };
+        return rtaResult(`Moved "${params.nodeId}" to [${params.x}, ${params.y}]`, await sdk.moveNode(params));
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: rtaFailure('Move node failed', error) }],
-          isError: true,
-        };
+        return rtaFailure('Move node failed', error);
       }
     }
   );
@@ -405,24 +123,9 @@ export function registerEditUiTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const device = await resolveDevice(params);
-        const json = await withClient(device, async (client) => {
-          const target = await resolveTarget(client, params.nodeId);
-          return client.send('focusNode', {
-            base: target.base,
-            keyPath: target.keyPath,
-            on: params.on ?? true,
-          });
-        });
-        return {
-          content: [{ type: 'text', text: `Focus(${params.on ?? true}) "${params.nodeId}" -> ${summarizeResponse(json)}` }],
-          isError: isRtaError(json) || undefined,
-        };
+        return rtaResult(`Focus(${params.on ?? true}) "${params.nodeId}"`, await sdk.focusNode(params));
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: rtaFailure('Focus node failed', error) }],
-          isError: true,
-        };
+        return rtaFailure('Focus node failed', error);
       }
     }
   );
@@ -440,23 +143,9 @@ export function registerEditUiTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const device = await resolveDevice(params);
-        const json = await withClient(device, async (client) => {
-          const target = await resolveTarget(client, params.nodeId);
-          return client.send('removeNode', {
-            base: target.base,
-            keyPath: target.keyPath,
-          });
-        });
-        return {
-          content: [{ type: 'text', text: `Removed "${params.nodeId}" -> ${summarizeResponse(json)}` }],
-          isError: isRtaError(json) || undefined,
-        };
+        return rtaResult(`Removed "${params.nodeId}"`, await sdk.removeNode(params));
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: rtaFailure('Remove node failed', error) }],
-          isError: true,
-        };
+        return rtaFailure('Remove node failed', error);
       }
     }
   );
@@ -482,27 +171,9 @@ export function registerEditUiTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const device = await resolveDevice(params);
-        const json = await withClient(device, async (client) => {
-          const target = await resolveTarget(client, params.parentId);
-          const fields = { ...(params.fields ?? {}) };
-          if (params.id) fields.id = params.id;
-          return client.send('createChild', {
-            base: target.base,
-            keyPath: target.keyPath,
-            subtype: params.subtype,
-            fields,
-          });
-        });
-        return {
-          content: [{ type: 'text', text: `Created <${params.subtype}>${params.id ? ` id="${params.id}"` : ''} under "${params.parentId}" -> ${summarizeResponse(json)}` }],
-          isError: isRtaError(json) || undefined,
-        };
+        return rtaResult(`Created <${params.subtype}>${params.id ? ` id="${params.id}"` : ''} under "${params.parentId}"`, await sdk.createNode(params));
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: rtaFailure('Create node failed', error) }],
-          isError: true,
-        };
+        return rtaFailure('Create node failed', error);
       }
     }
   );
@@ -525,35 +196,10 @@ export function registerEditUiTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const device = await resolveDevice(params);
-        if (!params.keyPath && !(params.nodeId && params.field)) {
-          return { content: [{ type: 'text', text: 'Provide either `keyPath` or both `nodeId` and `field`.' }], isError: true };
-        }
-        const json = await withClient(device, async (client) => {
-          let args: Record<string, unknown>;
-          if (params.keyPath) {
-            args = { base: params.base ?? 'scene', keyPath: params.keyPath };
-          } else {
-            const target = await resolveTarget(client, params.nodeId!);
-            const base = (params.base as Base) ?? target.base;
-            if (base === 'elementId') {
-              args = { base, keyPath: target.keyPath ?? '', field: params.field };
-            } else {
-              args = {
-                base,
-                keyPath: target.keyPath ? `${target.keyPath}.${params.field}` : params.field,
-                field: params.field,
-              };
-            }
-          }
-          return client.send('getValue', args);
-        });
+        const json = await sdk.getValue(params);
         return { content: [{ type: 'text', text: JSON.stringify(json, null, 2) }], isError: isRtaError(json) || undefined };
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: rtaFailure('Get value failed', error) }],
-          isError: true,
-        };
+        return rtaFailure('Get value failed', error);
       }
     }
   );
@@ -580,37 +226,10 @@ export function registerEditUiTools(server: McpServer): void {
     },
     async (params) => {
       try {
-        const device = await resolveDevice(params);
-        if (!params.keyPath && !(params.nodeId && params.field)) {
-          return { content: [{ type: 'text', text: 'Provide either `keyPath` or both `nodeId` and `field`.' }], isError: true };
-        }
-        const timeoutMs = params.timeoutMs ?? 10_000;
-        const json = await withClient(device, async (client) => {
-          let baseArgs: Record<string, unknown>;
-          if (params.keyPath) {
-            baseArgs = { base: 'scene', keyPath: params.keyPath };
-          } else {
-            const target = await resolveTarget(client, params.nodeId!);
-            if (target.base === 'elementId') {
-              baseArgs = { base: 'elementId', keyPath: target.keyPath ?? '', field: params.field };
-            } else {
-              baseArgs = {
-                base: target.base,
-                keyPath: target.keyPath ? `${target.keyPath}.${params.field}` : params.field!,
-                field: params.field,
-              };
-            }
-          }
-          const args: Record<string, unknown> = { ...baseArgs, observerFireTimeout: timeoutMs };
-          if (params.match !== undefined) args.match = params.match;
-          return client.send('onFieldChangeOnce', args, timeoutMs + 2000);
-        });
+        const json = await sdk.observeField(params);
         return { content: [{ type: 'text', text: JSON.stringify(json, null, 2) }], isError: isRtaError(json) || undefined };
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: rtaFailure('Observe field failed', error) }],
-          isError: true,
-        };
+        return rtaFailure('Observe field failed', error);
       }
     }
   );
