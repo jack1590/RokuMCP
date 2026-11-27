@@ -4,22 +4,60 @@ import { friendlyError } from '../roku-config.js';
 import { RokuError } from './errors.js';
 
 export interface ErrorInfo {
-  /** Stable, machine-readable: a RokuError or RCE code, http_<status>, timeout, connection_refused, host_not_found, or error. */
+  /**
+   * Stable and machine-readable: a RokuError or RCE code, http_<status>, timeout,
+   * connection_refused, host_not_found, a lower-case errno (enoent, econnreset, ...), or error.
+   */
   code: string;
-  /** The same text the MCP tools show after their "<Tool> failed:" prefix. */
+  /** The same text the MCP tools show after their "<Tool> failed:" prefix, with secrets removed. */
   message: string;
+}
+
+const SECRET_VARS = ['ROKU_RCE_TOKEN', 'ROKU_RCE_PASSWORD', 'ROKU_DEVICE_PASSWORD', 'ROKU_DEV_PASSWORD', 'ROKU_PASSWORD'];
+
+/** Removes bearer tokens, JWTs and the values of the secret ROKU_* variables from text. */
+export function redactSecrets(text: string, env: NodeJS.ProcessEnv = process.env): string {
+  let out = text.replace(/(Bearer\s+)[\w.~+/=-]+/gi, '$1<redacted>').replace(/eyJ[\w-]+\.[\w-]+\.[\w-]*/g, '<jwt>');
+  for (const k of SECRET_VARS) {
+    const v = env[k];
+    if (v && v.length >= 4) out = out.split(v).join('<redacted>');
+  }
+  return out;
+}
+
+const ERRNO: Record<string, string> = {
+  ETIMEDOUT: 'timeout',
+  ESOCKETTIMEDOUT: 'timeout',
+  ECONNABORTED: 'timeout',
+  ECONNREFUSED: 'connection_refused',
+  ENOTFOUND: 'host_not_found',
+  EAI_AGAIN: 'host_not_found',
+};
+
+/** A Node errno such as ENOENT (axios's own ERR_* codes are not errnos). */
+function errnoOf(error: unknown): string | undefined {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === 'string' && /^E(?!RR_)[A-Z]+(?:_[A-Z]+)*$/.test(code) ? code : undefined;
+}
+
+/** File system errors: their own message is clearer than friendlyError's network guesses. */
+const FS_ERRNO = new Set(['ENOENT', 'EACCES', 'EPERM', 'EISDIR', 'ENOTDIR', 'EEXIST', 'ENOSPC', 'EROFS']);
+
+function classify(error: unknown): string {
+  if (error instanceof RokuError) return error.code;
+  if (error instanceof RceError) return error.code ?? (error.status ? `http_${error.status}` : 'rce_error');
+  if (axios.isAxiosError(error) && error.response?.status) return `http_${error.response.status}`;
+  const errno = errnoOf(error);
+  if (errno) return ERRNO[errno] ?? errno.toLowerCase();
+  // Plain errors from the RTA client and the LAN socket connect end with "timed out" or "timed out after <n>ms".
+  const raw = error instanceof Error ? error.message : String(error);
+  if (/timed out( after \d+ ?ms)?\.?$/.test(raw)) return 'timeout';
+  return 'error';
 }
 
 /** A plain {code, message} for any error, for the CLI and code mode. Never includes a stack. */
 export function describeError(error: unknown): ErrorInfo {
-  if (error instanceof RokuError) return { code: error.code, message: error.message };
-  const message = friendlyError(error);
-  if (error instanceof RceError) return { code: error.code ?? (error.status ? `http_${error.status}` : 'rce_error'), message };
-  const raw = error instanceof Error ? error.message : String(error);
-  const errno = (error as { code?: unknown } | null)?.code;
-  if (errno === 'ECONNABORTED' || errno === 'ETIMEDOUT' || /ETIMEDOUT|ESOCKETTIMEDOUT|time(d )?out/i.test(raw)) return { code: 'timeout', message };
-  if (axios.isAxiosError(error) && error.response?.status) return { code: `http_${error.response.status}`, message };
-  if (errno === 'ECONNREFUSED' || /ECONNREFUSED/.test(raw)) return { code: 'connection_refused', message };
-  if (errno === 'ENOTFOUND' || /ENOTFOUND|getaddrinfo/.test(raw)) return { code: 'host_not_found', message };
-  return { code: 'error', message };
+  const raw = FS_ERRNO.has(errnoOf(error) ?? '') && error instanceof Error;
+  const message = error instanceof RokuError || raw ? (error as Error).message : friendlyError(error);
+  return { code: classify(error), message: redactSecrets(message) };
 }

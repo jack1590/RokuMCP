@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -18,7 +18,7 @@ async function cli(...argv: string[]) {
   world.calls = [];
   const r = await runCli(argv);
   assert.equal(r.stdout.includes('\n'), false, 'stdout is one JSON line');
-  return { code: r.exitCode, json: JSON.parse(r.stdout) };
+  return { code: r.exitCode, json: JSON.parse(r.stdout), stdout: r.stdout };
 }
 
 test('help lists one-shot commands only', async () => {
@@ -136,3 +136,76 @@ test('the rokuctl process prints one JSON line and sets the exit code', async ()
   assert.equal(r.code, 1);
   assert.equal(JSON.parse(r.stdout).error.code, 'no_token');
 });
+
+test('review fixes: typed unions, strict --json, --, no echo, --out folder', async () => {
+  let r = await cli('rta.observe', '--key-path', 'a.b', '--match', 'true', '--timeout-ms', '10', ...RCE);
+  assert.ok(world.calls.some((c) => c.includes('"match":true')), 'boolean, not "true"');
+  r = await cli('rta.observe', '--key-path', 'a.b', '--match', '5', '--timeout-ms', '10', ...RCE);
+  assert.ok(world.calls.some((c) => c.includes('"match":5')));
+  r = await cli('ui.find', '--attr', 'text', '--value', '5', ...RCE);
+  assert.equal(r.code, 0, 'a string-only field keeps "5" as text');
+
+  r = await cli('input.keypress', '--json', '{"key":"Home","rceDevise":"400"}');
+  assert.deepEqual([r.code, r.json.error.code], [2, 'usage']);
+  assert.match(r.json.error.message, /rceDevise/);
+
+  r = await cli('input.keys', ...RCE, '--delay-ms', '0', '--', '--weird', 'Up');
+  assert.deepEqual(world.calls, ['rce keypress --weird', 'rce keypress Up']);
+
+  r = await cli('app.deploy', '/x', 'hunter2pw', ...RCE);
+  assert.equal(r.code, 2);
+  assert.ok(!r.stdout.includes('hunter2pw'));
+
+  r = await cli('device.info', ...RCE, '--out', '/no/such/folder/x.json');
+  assert.deepEqual([r.code, r.json.error.code], [2, 'usage']);
+});
+
+test('review fixes: error codes and console.capture misses', async () => {
+  let r = await cli('profile.info', '/nonexistent/timeout-run.bsprof');
+  assert.deepEqual([r.code, r.json.error.code], [1, 'enoent']);
+  assert.match(r.json.error.message, /no such file/);
+
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'rokuctl-cap-'));
+  try {
+    r = await cli('console.capture', 'never', ...RCE, '--file', path.join(work, 'c.log'), '--settle-ms', '10', '--timeout-ms', '50');
+    assert.deepEqual([r.code, r.json.error.code], [3, 'timeout']);
+    assert.match(r.json.error.message, /c\.log/);
+    setTimeout(() => world.consoleEmit('boot done\n'), 100);
+    r = await cli('console.capture', 'boot', ...RCE, '--file', path.join(work, 'c.log'), '--settle-ms', '50', '--timeout-ms', '2000');
+    assert.equal(r.code, 0);
+    assert.equal(r.json.data.match.preview, 'boot done');
+    assert.equal(r.json.data.capture.active, false);
+  } finally {
+    fs.rmSync(work, { recursive: true, force: true });
+  }
+
+  process.env.ROKU_RCE_PASSWORD = 'sup3r-secret';
+  try {
+    const { describeError } = await import('../src/sdk/describe.js');
+    const info = describeError(new Error('login failed for sup3r-secret with Bearer abc.def'));
+    assert.equal(info.message, 'login failed for <redacted> with Bearer <redacted>');
+  } finally {
+    delete process.env.ROKU_RCE_PASSWORD;
+  }
+});
+
+test('signals print the JSON line and exit 129/130/143', async () => {
+  const bin = path.resolve(here, '..', 'src', 'cli.js');
+  for (const [signal, code] of [['SIGHUP', 129], ['SIGINT', 130], ['SIGTERM', 143]] as const) {
+    const child = spawnCli(bin, ['device.sleep', '5000']);
+    await new Promise((r) => setTimeout(r, 400));
+    child.proc.kill(signal);
+    const { exitCode, stdout } = await child.done;
+    assert.equal(exitCode, code, signal);
+    const json = JSON.parse(stdout);
+    assert.deepEqual([json.ok, json.error.code], [false, 'interrupted']);
+  }
+});
+
+function spawnCli(bin: string, args: string[]) {
+  const proc = spawn(process.execPath, [bin, ...args], { cwd: os.tmpdir(), env: { PATH: process.env.PATH ?? '' } });
+  let stdout = '';
+  proc.stdout.on('data', (d) => (stdout += d));
+  const done = new Promise<{ exitCode: number | null; stdout: string }>((resolve) => proc.on('close', (exitCode) => resolve({ exitCode, stdout })));
+  return { proc, done };
+}

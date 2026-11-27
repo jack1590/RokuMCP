@@ -4,6 +4,7 @@
  */
 import { z, type ZodRawShape } from 'zod';
 import * as sdk from './sdk/index.js';
+import { RokuError } from './sdk/errors.js';
 import { toolSpecs } from './tools/index.js';
 
 export interface Command {
@@ -16,8 +17,6 @@ export interface Command {
   positional?: string[];
   /** Holds state in this process between calls (console session, capture, recording): code mode only. */
   session?: boolean;
-  /** Extra input keys for commands that are not a single tool. */
-  extraShape?: ZodRawShape;
   run(options: any): unknown;
 }
 
@@ -34,6 +33,15 @@ const consoleCapture: Command = {
       match = await sdk.consoleWait(options);
     } finally {
       capture = await sdk.captureStop();
+    }
+    if (!match.matched) {
+      const why =
+        match.reason === 'timeout'
+          ? `No console line matched /${options.pattern}/ within ${options.timeoutMs} ms`
+          : match.reason === 'waiting_for_debugger'
+            ? 'The channel is waiting for the VS Code debugger (redeploy it with app.deploy)'
+            : 'The console connection closed before a line matched';
+      throw new RokuError(match.reason ?? 'no_match', `${why}. The capture is in ${capture?.file}.`);
     }
     return { match, capture };
   },
@@ -100,7 +108,7 @@ export function commandShape(command: Command): ZodRawShape {
     const specs = toolSpecs();
     return { ...specs.get('roku_console_capture_start')!.inputSchema, ...specs.get('roku_console_wait')!.inputSchema };
   }
-  return command.extraShape ?? {};
+  return {};
 }
 
 export function commandSummary(command: Command): string {

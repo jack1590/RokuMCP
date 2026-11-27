@@ -11,6 +11,7 @@
  */
 import './env.js';
 import fs from 'fs';
+import path from 'path';
 import { z } from 'zod';
 import { COMMANDS, commandShape, commandSummary, findCommand, parseCommandInput, type Command } from './commands.js';
 import { describeError } from './sdk/describe.js';
@@ -32,14 +33,17 @@ const camel = (flag: string) => flag.replace(/-([a-z])/g, (_, c: string) => c.to
 type Field = Parameters<typeof z.safeParse>[0] | undefined;
 const accepts = (field: Field, value: unknown) => !!field && z.safeParse(field, value).success;
 
-/** The first of raw text or its JSON reading that the schema field accepts. */
+/**
+ * The JSON reading of a value when the field accepts it as a non-string (so `--match true` is a
+ * boolean where the schema allows one), else the raw text. A string "true" for such a field needs --json.
+ */
 function coerce(field: Field, raw: string): unknown {
-  if (!field || accepts(field, raw)) return raw;
+  if (!field) return raw;
   try {
     const parsed = JSON.parse(raw);
-    if (accepts(field, parsed)) return parsed;
+    if (typeof parsed !== 'string' && accepts(field, parsed)) return parsed;
   } catch {
-    // not JSON: leave raw so validation reports the field
+    // not JSON: the raw text
   }
   return raw;
 }
@@ -73,10 +77,15 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let out: string | undefined;
   let timeoutMs: number | undefined;
 
+  let optionsEnded = false;
   for (let i = 0; i < rest.length; i++) {
     const arg = rest[i];
-    if (!arg.startsWith('--') || arg === '--') {
+    if (optionsEnded || !arg.startsWith('--')) {
       positionals.push(arg);
+      continue;
+    }
+    if (arg === '--') {
+      optionsEnded = true;
       continue;
     }
     const eq = arg.indexOf('=');
@@ -101,6 +110,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
         throw new UsageError('--json must be a JSON object');
       }
       if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new UsageError('--json must be a JSON object');
+      const unknown = Object.keys(obj).filter((k) => !(k in shape));
+      if (unknown.length) throw new UsageError(`Unknown option${unknown.length > 1 ? 's' : ''} in --json for ${name}: ${unknown.join(', ')}`);
       Object.assign(input, obj);
     } else if (key === 'password') {
       throw new UsageError('Pass the password through ROKU_DEVICE_PASSWORD or ROKU_RCE_PASSWORD (or .env), not a flag: flags are visible to other processes.');
@@ -124,9 +135,11 @@ export function parseArgs(argv: string[]): ParsedArgs {
     }
   });
   if (positionals.length > slots.length && !slots.some((s) => s.endsWith('...'))) {
-    throw new UsageError(`Too many arguments for ${name}: ${positionals.slice(slots.length).join(' ')}`);
+    // The values are not echoed: a stray argument may be a mistyped password.
+    throw new UsageError(`Too many arguments for ${name}: expected at most ${slots.length}, got ${positionals.length}.`);
   }
   if ('password' in input) throw new UsageError('Pass the password through the environment or .env, not --json.');
+  if (out && !fs.existsSync(path.dirname(path.resolve(out)))) throw new UsageError(`--out folder does not exist: ${path.dirname(path.resolve(out))}`);
   return { command, input, out, timeoutMs };
 }
 
@@ -193,9 +206,7 @@ export async function runCli(argv: string[]): Promise<Output> {
   } catch (error) {
     if (error instanceof CliTimeout) {
       // A Run whose start was cut off would bill until its max runtime.
-      const { stopped, failed } = await stopStartedRuns(3500);
-      const note = stopped.length ? ` Stopped the Cloud Device Run this command started.` : failed.length ? ` A Cloud Device Run it started could not be stopped: check rce.status.` : '';
-      return failure(3, 'timeout', error.message + note);
+      return failure(3, 'timeout', error.message + (await stopRuns()));
     }
     const info = describeError(error);
     return failure(info.code === 'timeout' ? 3 : 1, info.code, info.message);
@@ -204,7 +215,11 @@ export async function runCli(argv: string[]): Promise<Output> {
   const { data, binary } = stripBinary(result);
   if (parsed.out) {
     const body = binary ?? (typeof data === 'string' ? data : jsonify(data));
-    fs.writeFileSync(parsed.out, body);
+    try {
+      fs.writeFileSync(parsed.out, body);
+    } catch (error) {
+      return failure(1, 'out_write_failed', `${parsed.command.name} succeeded, but writing --out failed: ${describeError(error).message}`);
+    }
     return success({ file: parsed.out, bytes: Buffer.byteLength(body), ...(binary && data && typeof data === 'object' ? { result: data } : {}) });
   }
   const out = success(data);
@@ -216,17 +231,42 @@ export async function runCli(argv: string[]): Promise<Output> {
 
 const isDirectRun = !!process.argv[1] && /(?:^|[\\/])(?:rokuctl|cli\.js)$/.test(process.argv[1]);
 
+const SIGNAL_EXIT = { SIGHUP: 129, SIGINT: 130, SIGTERM: 143 } as const;
+
+/** Writes the one JSON line and exits; later calls are ignored. */
+let finished = false;
+function finish(exitCode: number, stdout: string): void {
+  if (finished) return;
+  finished = true;
+  process.stdout.write(stdout + '\n', () => process.exit(exitCode));
+}
+
+/** Stops any Cloud Device Run this process started; returns a sentence for the error message. */
+async function stopRuns(): Promise<string> {
+  // No MCP client is waiting to SIGKILL a CLI, so give a just-requested Run time to show up.
+  const { stopped, failed } = await stopStartedRuns(20_000);
+  const parts: string[] = [];
+  if (stopped.length) parts.push(`Stopped the Cloud Device Run it started (device ${stopped.map((r) => r.deviceId).join(', ')}).`);
+  if (failed.length) {
+    parts.push(`Could not stop a Run it started on Cloud Device ${failed.map((f) => f.deviceId).join(', ')}: it may still be billing. Check with "rokuctl rce.status <device>" and stop it with "rokuctl rce.stop <device>".`);
+  }
+  return parts.length ? ' ' + parts.join(' ') : '';
+}
+
 if (isDirectRun) {
-  // A Run still starting when the user interrupts would bill until its max runtime: stop it.
-  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  for (const signal of Object.keys(SIGNAL_EXIT) as Array<keyof typeof SIGNAL_EXIT>) {
     process.on(signal, () => {
-      void stopStartedRuns(3500).finally(() => process.exit(130));
+      void stopRuns().then((note) => finish(SIGNAL_EXIT[signal], jsonify({ ok: false, error: { code: 'interrupted', message: `Interrupted by ${signal}.${note}` } }, 0)));
     });
   }
+  process.on('uncaughtException', (error) => {
+    void stopRuns().then((note) => {
+      const info = describeError(error);
+      finish(1, jsonify({ ok: false, error: { code: info.code, message: info.message + note } }, 0));
+    });
+  });
   runCli(process.argv.slice(2)).then(
-    ({ exitCode, stdout }) => process.stdout.write(stdout + '\n', () => process.exit(exitCode)),
-    (error) => {
-      process.stdout.write(jsonify({ ok: false, error: describeError(error) }, 0) + '\n', () => process.exit(1));
-    }
+    ({ exitCode, stdout }) => finish(exitCode, stdout),
+    (error) => finish(1, jsonify({ ok: false, error: describeError(error) }, 0))
   );
 }
