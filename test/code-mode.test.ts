@@ -427,3 +427,32 @@ test('review fixes 5: fan-out is queued, the timeout still fires, fetches and se
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('review fixes 6: one queue across runs, waits skip it, a slow-drip fetch is cut off', { skip, timeout: 90_000 }, async () => {
+  const http = await import('node:http');
+  const server = http.createServer((_req, res) => {
+    res.writeHead(200, { 'content-type': 'text/plain' });
+    res.write('#EXTM3U\n');
+    const t = setInterval(() => res.write('#'), 1000);
+    res.on('close', () => clearInterval(t));
+  });
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+  const port = (server.address() as { port: number }).port;
+  try {
+    // Two long waits in parallel runs do not block a third run's calls.
+    const waits = [1, 2].map(() => run(`return await roku.device.sleep({ durationMs: 4000 })`, { timeoutMs: 10_000 }));
+    const t = Date.now();
+    const quick = await run(`await roku.input.keypress({ key: 'Up' }); return await roku.device.info()`, { timeoutMs: 10_000 });
+    assert.equal(quick.ok, true, JSON.stringify(quick.error));
+    assert.ok(Date.now() - t < 3000, `quick run waited ${Date.now() - t} ms behind waits`);
+    await Promise.all(waits);
+
+    const { loadManifest } = await import('../src/stream/manifest.js');
+    const t2 = Date.now();
+    await assert.rejects(loadManifest({ url: `http://127.0.0.1:${port}/drip.m3u8`, limits: { maxBytes: 5 << 20, timeoutMs: 1500 } }));
+    assert.ok(Date.now() - t2 < 4000, `slow drip held for ${Date.now() - t2} ms`);
+  } finally {
+    server.closeAllConnections();
+    server.close();
+  }
+});

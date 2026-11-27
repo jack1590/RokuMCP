@@ -450,7 +450,9 @@ function distinct<T>(arr: T[]): T[] {
   return [...new Set(arr)];
 }
 
-const fetchLimits = (l?: { maxBytes: number; timeoutMs: number }) => (l ? { maxContentLength: l.maxBytes, timeout: l.timeoutMs } : {});
+// axios's timeout resets on every chunk (a slow drip never trips it): the signal is wall-clock.
+const fetchLimits = (l?: { maxBytes: number; timeoutMs: number }) =>
+  l ? { maxContentLength: l.maxBytes, timeout: l.timeoutMs, signal: AbortSignal.timeout(l.timeoutMs) } : {};
 
 /** Fetch + parse a manifest from any of the supported sources. */
 export async function loadManifest(source: ManifestSource): Promise<ManifestSummary> {

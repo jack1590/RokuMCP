@@ -27,7 +27,7 @@ export const RUN_LIMITS = {
   maxResultChars: 100 * 1024,
   maxArgChars: 1024 * 1024,
   maxParseBytes: 5 * 1024 * 1024,
-  /** Calls running at once per run; more wait in a queue (CPU-heavy parses cannot pile up). */
+  /** Calls running at once across all runs; more wait in a queue (CPU-heavy parses cannot pile up). */
   maxInFlight: 2,
 };
 
@@ -110,31 +110,50 @@ function childEnv(): NodeJS.ProcessEnv {
   return process.platform === 'win32' && process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {};
 }
 
+/** Calls that only wait (device, console, observer): they skip the queue. */
+const WAIT_CALLS = new Set(['device.sleep', 'console.wait', 'console.capture', 'rta.observe', 'rce.start', 'rce.stop']);
+
+/** One queue for every roku_run in this server: parallel runs cannot add up CPU-heavy calls. */
+const slots: { inFlight: number; queue: Array<{ owner: Dispatcher; resolve: () => void }> } = { inFlight: 0, queue: [] };
+
 class Dispatcher {
   calls = 0;
   readonly files = new Set<string>();
-  private inFlight = 0;
-  private readonly queue: Array<() => void> = [];
-  /** Set when the run's result is decided: queued calls are dropped, not started. */
+  /** Set when the run's result is decided: its queued calls are dropped, not started. */
   closed = false;
 
-  /** Runs dispatch with at most RUN_LIMITS.maxInFlight calls at once. */
+  /** This run's calls holding a server-wide slot; released when the run ends. */
+  private held = 0;
+
+  /** Runs dispatch through the server-wide queue (at most RUN_LIMITS.maxInFlight calls at once). */
   async enqueue(name: unknown, args: unknown): Promise<unknown> {
-    while (this.inFlight >= RUN_LIMITS.maxInFlight && !this.closed) await new Promise<void>((resolve) => this.queue.push(resolve));
+    // Waits use no CPU and may last minutes: they must not hold a slot other runs need.
+    if (typeof name === 'string' && WAIT_CALLS.has(name)) return this.dispatch(name, args);
+    while (slots.inFlight >= RUN_LIMITS.maxInFlight && !this.closed) await new Promise<void>((resolve) => slots.queue.push({ owner: this, resolve }));
     if (this.closed) throw new RokuError('run_ended', 'The run ended before this call started.');
-    this.inFlight++;
+    slots.inFlight++;
+    this.held++;
     try {
       return await this.dispatch(name, args);
     } finally {
-      this.inFlight--;
-      // Yield to the event loop between calls, so the run's timeout timer can fire.
-      setImmediate(() => this.queue.shift()?.());
+      if (this.held > 0) {
+        this.held--;
+        slots.inFlight--;
+      }
+      // Yield to the event loop between calls, so a run's timeout timer can fire.
+      setImmediate(() => slots.queue.shift()?.resolve());
     }
   }
 
   close(): void {
     this.closed = true;
-    for (const next of this.queue.splice(0)) next();
+    // A call still running after the run ended (it cannot be cancelled) stops counting against other runs.
+    slots.inFlight -= this.held;
+    this.held = 0;
+    setImmediate(() => slots.queue.shift()?.resolve());
+    for (let i = slots.queue.length - 1; i >= 0; i--) {
+      if (slots.queue[i].owner === this) slots.queue.splice(i, 1)[0].resolve();
+    }
   }
 
   constructor(private readonly policy: PathPolicy, private readonly target: TargetParams) {}
