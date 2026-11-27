@@ -26,6 +26,21 @@ class RokuRunError extends Error {
 
 const send = (message: unknown) => (process as unknown as { send(m: unknown): void }).send(message);
 
+/**
+ * Close the gaps the permission model leaves (Node 22): signals to other processes (SIGUSR1 opens
+ * the parent's inspector) and node:sqlite, which reads and writes files outside the grants.
+ * Fails closed: the parent refuses to run the snippet if any of these is still reachable.
+ */
+function harden(): string | undefined {
+  const p = process as unknown as Record<string, unknown>;
+  for (const k of ['kill', '_kill', '_debugProcess', '_debugEnd']) delete p[k];
+  const left = ['kill', '_kill', '_debugProcess', '_debugEnd'].filter((k) => typeof p[k] === 'function');
+  if (left.length) return `process.${left.join(', process.')} is still available`;
+  if (process.getBuiltinModule('node:sqlite') !== undefined) return 'node:sqlite is available';
+  return undefined;
+}
+const unsafe = harden();
+
 function format(value: unknown): string {
   if (typeof value === 'string') return value;
   try {
@@ -99,6 +114,6 @@ process.on('message', async (raw: unknown) => {
     send({ type: 'done', ...outcome, logs, logsTruncated });
   }
 });
-send({ type: 'ready' });
+send(unsafe ? { type: 'unsafe', reason: unsafe } : { type: 'ready' });
 
 export {};

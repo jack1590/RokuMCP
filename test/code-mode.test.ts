@@ -144,7 +144,8 @@ test('roku.fs stays inside the working directory and away from secrets', { skip 
         symlinkDir: await t(() => roku.fs.read('link/secret.txt')),
         symlinkFile: await t(() => roku.fs.read('env-link.txt')),
         writeEnv: await t(() => roku.fs.write('.env', 'x')),
-        writeOut: await t(() => roku.fs.write('link/pwn.txt', 'x')),
+        writeOut: await t(() => roku.fs.write('../link/pwn.txt', 'x')),
+        writeSrc: await t(() => roku.fs.write('../package.json', '{}')),
         key: await t(() => roku.fs.write('server.key', 'x')),
       };
     `,
@@ -153,10 +154,10 @@ test('roku.fs stays inside the working directory and away from secrets', { skip 
     assert.equal(r.ok, true, JSON.stringify(r.error));
     const v = r.result as Record<string, unknown>;
     assert.equal(v.read, 'hello');
-    assert.deepEqual(v.write, { path: path.join('out', 'result.json'), bytes: 7 });
-    assert.deepEqual(r.files, [path.join('out', 'result.json')]);
+    assert.deepEqual(v.write, { path: path.join('roku-run', 'out', 'result.json'), bytes: 7 });
+    assert.deepEqual(r.files, [path.join('roku-run', 'out', 'result.json')]);
     assert.ok(!(v.list as string[]).includes('.env') && !(v.list as string[]).includes('.git'));
-    for (const k of ['env', 'envLocal', 'git', 'dotdot', 'abs', 'symlinkDir', 'symlinkFile', 'writeEnv', 'writeOut', 'key']) assert.equal(v[k], 'path_denied', k);
+    for (const k of ['env', 'envLocal', 'git', 'dotdot', 'abs', 'symlinkDir', 'symlinkFile', 'writeEnv', 'writeOut', 'writeSrc', 'key']) assert.equal(v[k], 'path_denied', k);
     assert.equal(fs.existsSync(path.join(outside, 'pwn.txt')), false);
     assert.equal(fs.readFileSync(path.join(root, '.env'), 'utf8').includes('sk-live'), true, '.env untouched');
   } finally {
@@ -196,5 +197,64 @@ test('SDK path options obey the same policy', { skip }, async () => {
     assert.equal((v.deploy as { label: string }).label, 'Cloud Device 400 (Parity_1)');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('review fixes: no signals, no sqlite, no spoofed results, no calls after done', { skip, timeout: 60_000 }, async () => {
+  let r = await run(`
+    let sqlite = 'none';
+    try { sqlite = typeof (await import('node:sqlite')).DatabaseSync; } catch (e) { sqlite = e.code; }
+    return { kill: typeof process.kill, _kill: typeof process._kill, debug: typeof process._debugProcess, sqlite, builtin: typeof process.getBuiltinModule('node:sqlite') };
+  `);
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  assert.deepEqual(r.result, { kill: 'undefined', _kill: 'undefined', debug: 'undefined', sqlite: 'ERR_UNKNOWN_BUILTIN_MODULE', builtin: 'undefined' });
+
+  r = await run(`process.send({ type: 'done', logs: Array(50000).fill('x'.repeat(1000)), error: { code: 'timeout', message: 'y'.repeat(1e6) } }); await new Promise(() => {})`, { timeoutMs: 5000 });
+  assert.equal(r.error?.code, 'snippet_error', 'a snippet cannot claim a sandbox code');
+  assert.ok(r.error!.message.length <= 2000);
+  assert.ok(r.logs.join('').length <= 64 * 1024 && r.logsTruncated);
+
+  r = await run(`process.send({ type: 'done', value: 1 }); for (let i = 0; i < 5; i++) await roku.input.keypress({ key: 'Up' }).catch(() => {}); process.send({ type: 'ready' });`, { timeoutMs: 3000 });
+  assert.equal(r.ok, true);
+  await new Promise((res) => setTimeout(res, 200));
+  assert.ok(!world.calls.includes('rce keypress Up'), 'no call runs after done');
+});
+
+test('review fixes: dangling links, outFile, more secret files, deploy globs', { skip }, async () => {
+  const root = workdir();
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'roku-out-'));
+  fs.mkdirSync(path.join(root, 'roku-run'));
+  fs.symlinkSync(path.join(outside, 'new.txt'), path.join(root, 'roku-run', 'dangling'));
+  for (const f of ['.mcp.json', 'mcp.json', 'bsconfig.json', 'rokudeploy.json', '.git-credentials', 'prod.env', '.envrc']) fs.writeFileSync(path.join(root, f), 'secret');
+  fs.mkdirSync(path.join(root, '.windsurf'));
+  fs.writeFileSync(path.join(root, '.windsurf', 'mcp.json'), 'secret');
+  fs.mkdirSync(path.join(root, 'app', 'source'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'app', 'manifest'), 'title=x\n');
+  fs.writeFileSync(path.join(root, 'app', 'source', '.env'), 'secret');
+  try {
+    const r = await run(
+      `
+      const t = async (f) => { try { return await f(); } catch (e) { return e.code; } };
+      const out = {};
+      out.dangling = await t(() => roku.fs.write('dangling', 'PWNED'));
+      out.outFile = await t(() => roku.ui.screenshot({ outDir: 'shots', outFile: '../../escaped' }));
+      out.perfettoOut = await t(() => roku.perfetto.start({ host: '127.0.0.1', outFile: '../x' }));
+      for (const f of ['.mcp.json', 'mcp.json', 'bsconfig.json', 'rokudeploy.json', '.git-credentials', 'prod.env', '.envrc', '.windsurf/mcp.json']) out[f] = await t(() => roku.fs.read(f));
+      out.glob = await t(() => roku.app.deploy({ rootDir: 'app', files: ['source/[.]env'] }));
+      out.nestedSecret = await t(() => roku.app.deploy({ rootDir: 'app' }));
+      out.shot = (await roku.ui.screenshot({ outDir: 'shots', outFile: 'ok' })).filePath;
+      return out;
+    `,
+      { root }
+    );
+    assert.equal(r.ok, true, JSON.stringify(r.error));
+    const v = r.result as Record<string, unknown>;
+    for (const [k, code] of Object.entries(v)) if (k !== 'shot') assert.equal(code, 'path_denied', k);
+    assert.equal(v.shot, path.join(root, 'roku-run', 'shots', 'ok.png'));
+    assert.equal(fs.existsSync(path.join(outside, 'new.txt')), false, 'dangling link target not created');
+    assert.deepEqual(fs.readdirSync(outside), []);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
   }
 });

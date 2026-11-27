@@ -1,28 +1,44 @@
 /**
- * Which local paths a roku_run snippet may name: only inside the server's working directory,
- * never through a symlink that leaves it, and never a file that usually holds secrets.
+ * Which local paths a roku_run snippet may name. Reads: anywhere inside the server's working
+ * directory except secret files. Writes: only inside its output folder (roku-run/ by default),
+ * so a snippet cannot rewrite code, config or CI files that run later outside the sandbox.
+ * Symlinks are followed (dangling ones too) before the inside-root check.
  */
 import fs from 'fs';
 import path from 'path';
 import { RokuError } from '../sdk/errors.js';
 
-/** File names and folders a snippet can never read, write or pass to the SDK. */
-const SECRET_NAME = /^(\.env(\..*)?|\.npmrc|\.netrc|\.pypirc|\.mcpregistry_.*|id_(rsa|dsa|ecdsa|ed25519)(\.pub)?|.*\.(pem|key|p12|pfx|keystore|jks))$/i;
-const SECRET_DIR = /^(\.git|\.ssh|\.aws|\.gnupg|\.claude|\.cursor|\.vscode)$/i;
+/** File names that usually hold secrets or device passwords. */
+const SECRET_NAME =
+  /^(\.env(\..*)?|.*\.env|\.envrc|\.npmrc|\.yarnrc(\.yml)?|\.netrc|\.pypirc|\.git-credentials|\.mcpregistry_.*|\.?mcp\.json|bsconfig.*\.json|rokudeploy.*\.json|credentials(\..*)?|secrets?(\..*)?|id_(rsa|dsa|ecdsa|ed25519)(\.pub)?|.*\.(pem|key|p12|pfx|keystore|jks|secret))$/i;
+/** Folders that hold credentials or editor and agent configuration. */
+const SECRET_DIR = /^(\.git|\.ssh|\.aws|\.azure|\.gnupg|\.docker|\.kube|\.config|\.claude|\.cursor|\.vscode|\.windsurf|\.idea|\.continue|\.codex|\.gemini)$/i;
+
+export const OUTPUT_DIR = 'roku-run';
 
 const denied = (message: string) => new RokuError('path_denied', message);
 
-/** The deepest existing ancestor, resolved through symlinks, plus the rest of the path. */
-function realish(abs: string): string {
-  let dir = abs;
+/** Windows ignores trailing dots and spaces, and "name:stream" is the same file: compare the plain name. */
+const plainName = (seg: string) => (process.platform === 'win32' ? seg.split(':')[0].replace(/[. ]+$/, '') : seg);
+const isSecret = (seg: string) => SECRET_NAME.test(plainName(seg)) || SECRET_DIR.test(plainName(seg));
+
+/** The path with every symlink resolved, dangling ones included; missing tail segments are kept. */
+function resolveLinks(abs: string, hops = 0): string {
+  if (hops > 40) throw denied('too many symlinks');
   const rest: string[] = [];
-  while (!fs.existsSync(dir)) {
-    rest.unshift(path.basename(dir));
+  let dir = abs;
+  for (;;) {
+    const st = fs.lstatSync(dir, { throwIfNoEntry: false });
+    if (st?.isSymbolicLink()) {
+      const target = path.resolve(path.dirname(dir), fs.readlinkSync(dir));
+      return resolveLinks(path.join(target, ...rest), hops + 1);
+    }
+    if (st) return path.join(fs.realpathSync(dir), ...rest);
     const parent = path.dirname(dir);
-    if (parent === dir) break;
+    if (parent === dir) return abs;
+    rest.unshift(path.basename(dir));
     dir = parent;
   }
-  return path.join(fs.realpathSync(dir), ...rest);
 }
 
 const inside = (child: string, parent: string) => {
@@ -32,44 +48,68 @@ const inside = (child: string, parent: string) => {
 
 export class PathPolicy {
   readonly root: string;
+  readonly outputDir: string;
 
   constructor(root: string = process.cwd()) {
     this.root = fs.realpathSync(root);
+    this.outputDir = path.join(this.root, OUTPUT_DIR);
   }
 
   /** The absolute path for a snippet-supplied path, or a path_denied RokuError. */
   resolve(p: unknown, what = 'path'): string {
-    if (typeof p !== 'string' || p === '') throw denied(`${what} must be a non-empty string`);
-    const abs = realish(path.resolve(this.root, p));
+    if (typeof p !== 'string' || p === '' || p.includes('\0')) throw denied(`${what} must be a non-empty string`);
+    if (process.platform === 'win32' && /:/.test(p.slice(path.isAbsolute(p) ? 2 : 0))) throw denied(`${what} "${p}" names an alternate data stream`);
+    const abs = resolveLinks(path.resolve(this.root, p));
     if (!inside(abs, this.root)) throw denied(`${what} "${p}" is outside the working directory (${this.root})`);
     for (const seg of path.relative(this.root, abs).split(path.sep)) {
-      if (SECRET_NAME.test(seg) || SECRET_DIR.test(seg)) throw denied(`${what} "${p}" names a protected file or folder (${seg})`);
+      if (isSecret(seg)) throw denied(`${what} "${p}" names a protected file or folder (${seg})`);
     }
     return abs;
   }
 
-  /** A deploy rootDir: inside the root, and not holding a secret file at its top level. */
-  resolveDeployRoot(p: unknown): string {
-    const abs = this.resolve(p, 'rootDir');
-    const secret = fs.existsSync(abs) ? fs.readdirSync(abs).find((n) => SECRET_NAME.test(n)) : undefined;
-    if (secret) throw denied(`rootDir "${p}" holds ${secret}; deploy a build folder instead`);
+  /** A file to read: allowed path, and a regular file (a FIFO would block the server). */
+  resolveRead(p: unknown, what = 'path'): string {
+    const abs = this.resolve(p, what);
+    const st = fs.statSync(abs, { throwIfNoEntry: false });
+    if (st && !st.isFile() && !st.isDirectory()) throw denied(`${what} "${p}" is not a regular file`);
     return abs;
   }
 
-  /** Deploy globs stay relative and never name dotfiles. */
-  checkGlobs(patterns: unknown): void {
-    if (patterns === undefined) return;
-    if (!Array.isArray(patterns)) throw denied('files must be an array of glob patterns');
-    for (const g of patterns) {
-      if (typeof g !== 'string' || path.isAbsolute(g) || /(^|[\\/])\.\.([\\/]|$)/.test(g) || /(^|[\\/{,!])\./.test(g)) {
-        throw denied(`files pattern ${JSON.stringify(g)} must be relative, without "..", and must not name dotfiles`);
+  /** A path to write: allowed, and inside the output folder (relative paths are taken from it). */
+  resolveWrite(p: unknown, what = 'path'): string {
+    if (typeof p !== 'string' || p === '') throw denied(`${what} must be a non-empty string`);
+    const abs = this.resolve(path.isAbsolute(p) ? p : path.join(OUTPUT_DIR, p), what);
+    if (!inside(abs, resolveLinks(this.outputDir))) throw denied(`${what} "${p}" is outside the ${OUTPUT_DIR}/ output folder; roku_run writes only there`);
+    return abs;
+  }
+
+  /** A deploy rootDir: allowed, with no secret file and no symlink anywhere in it (it is zipped and uploaded). */
+  resolveDeployRoot(p: unknown): string {
+    const abs = this.resolve(p, 'rootDir');
+    let seen = 0;
+    const walk = (dir: string) => {
+      for (const d of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (++seen > 20_000) throw denied(`rootDir "${p}" has more than 20000 entries; deploy a build folder`);
+        const rel = path.relative(abs, path.join(dir, d.name));
+        if (d.isSymbolicLink()) throw denied(`rootDir "${p}" contains a symlink (${rel}); deploy a build folder without links`);
+        if (isSecret(d.name)) throw denied(`rootDir "${p}" contains ${rel}; deploy a build folder without secrets`);
+        if (d.isDirectory()) walk(path.join(dir, d.name));
       }
+    };
+    if (fs.statSync(abs, { throwIfNoEntry: false })?.isDirectory()) walk(abs);
+    return abs;
+  }
+
+  /** A bare file name (no folders), for options such as outFile. */
+  checkFileName(name: unknown, what: string): void {
+    if (typeof name !== 'string' || name === '' || name === '.' || name === '..' || /[\\/:\0]/.test(name) || isSecret(name)) {
+      throw denied(`${what} must be a plain file name without folders`);
     }
   }
 
   /** Whether a directory entry may be listed. */
   listable(name: string): boolean {
-    return !SECRET_NAME.test(name) && !SECRET_DIR.test(name);
+    return !isSecret(name);
   }
 
   relative(abs: string): string {
