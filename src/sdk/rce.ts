@@ -84,6 +84,19 @@ export async function cloudStart(options: CloudStartOptions = {}) {
   }
 }
 
+/**
+ * Requests a stop of the device's current Run only if this server started it (no wait for
+ * shutdown). For cleanup after a killed roku_run script.
+ */
+export async function stopRunStartedHere(rceDevice?: string): Promise<{ deviceId: number; stopped: boolean; runId?: number }> {
+  const core = rceCore();
+  const device = await core.findDevice(deviceRef(rceDevice));
+  const run = device.running_device;
+  if (!run || !core.startedHere(device)) return { deviceId: device.id, stopped: false };
+  await core.stop(device.id, { runId: run.id });
+  return { deviceId: device.id, stopped: true, runId: run.id };
+}
+
 /** Stops the device's current Run (even one another client started) and waits for shutdown. */
 export async function cloudStop(options: { rceDevice?: string } = {}) {
   const core = rceCore();

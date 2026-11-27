@@ -36,7 +36,7 @@ try {
 }
 ```
 
-Give this `roku_run` a `timeoutMs` of about 300000: the start alone can take a minute. If `roku_run` kills the script (timeout, memory, crash), `finally` does not run and the Run keeps billing: then check `roku_rce_status` and call `roku_rce_stop`.
+Give this `roku_run` a `timeoutMs` of about 300000: the start alone can take a minute. If `roku_run` kills the script (timeout, memory, crash), `finally` does not run, so the server stops the Run the script started and says so in the error. Confirm with `roku_rce_status`.
 
 ### From a shell (`rokuctl`)
 

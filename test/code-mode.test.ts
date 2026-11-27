@@ -554,3 +554,38 @@ test('review fixes 10: host check is linear, waits are limited per run, kept con
   assert.equal(r.ok, true, JSON.stringify(r.error));
   assert.ok(Date.now() - t < 3000);
 });
+
+test('a killed script has the Cloud Device Runs it started stopped, also one still starting', { skip, timeout: 60_000 }, async () => {
+  world.trackRuns = true;
+  try {
+    // Started and up, then the script hangs past its timeout.
+    let r = await run(`await roku.rce.start({ rceDevice: '401', maxRuntimeMinutes: 5 }); while (true) {}`, { timeoutMs: 1500 });
+    assert.equal(r.error?.code, 'timeout');
+    assert.match(r.error!.message, /Stopped the Cloud Device Run it started on device 401/);
+    assert.ok(world.calls.some((c) => c.startsWith('rce stop 401')), world.calls.join('\n'));
+
+    // Still starting when the script is killed: stopped once the start returns.
+    world.readyDelayMs = 1500;
+    r = await run(`roku.rce.start({ rceDevice: '402' }); await new Promise(() => {})`, { timeoutMs: 500 });
+    assert.equal(r.error?.code, 'timeout');
+    assert.match(r.error!.message, /still starting will be stopped once it is up/);
+    await new Promise((res) => setTimeout(res, 2000));
+    assert.ok(world.calls.some((c) => c.startsWith('rce stop 402')), world.calls.join('\n'));
+
+    // A script that returns normally keeps its Run on purpose.
+    world.readyDelayMs = 0;
+    world.calls = [];
+    r = await runSnippet({ code: `await roku.rce.start({ rceDevice: '401' }); return 'up'`, rceDevice: '400' });
+    assert.equal(r.result, 'up');
+    await new Promise((res) => setTimeout(res, 100));
+    assert.ok(!world.calls.some((c) => c.startsWith('rce stop')));
+
+    // A refused start (the device already has a Run another client started) stops nothing.
+    world.calls = [];
+    r = await run(`await roku.rce.start({ rceDevice: '400' }).catch(() => 0); while (true) {}`, { timeoutMs: 800 });
+    assert.ok(!world.calls.some((c) => c.startsWith('rce stop')));
+  } finally {
+    world.trackRuns = false;
+    world.readyDelayMs = 0;
+  }
+});

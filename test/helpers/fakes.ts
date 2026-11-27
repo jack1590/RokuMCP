@@ -51,6 +51,10 @@ export class FakeWorld {
   closedPorts = new Set<number>();
   /** Cloud Device ids whose Run never becomes ready. */
   readyFails = new Set<number>();
+  /** Opt-in: start/stop change the stub devices' Run state, and startedHere tracks Runs it started. */
+  trackRuns = false;
+  /** With trackRuns: how long waitUntilReady takes. */
+  readyDelayMs = 0;
   private consoles = new Set<{ push: (s: string) => void }>();
 
   log(entry: string): void {
@@ -197,6 +201,7 @@ export function rceDevices(): RceDevice[] {
 /** A stub RceClientLike: the Instance API answers from the same FakeWorld as the LAN fakes. */
 export function stubRce(world: FakeWorld): RceClientLike {
   const devices = rceDevices();
+  const started = new Set<number>();
   const find = (ref: string | number) => {
     const d = devices.find((x) => String(x.id) === String(ref) || x.name === ref);
     if (!d) throw new RceError(`No Cloud Device matches "${ref}"`, { code: 'not_found' });
@@ -242,18 +247,29 @@ export function stubRce(world: FakeWorld): RceClientLike {
     ],
     start: async (id: number, o: unknown) => {
       world.log(`rce start ${id} ${JSON.stringify(o)}`);
+      if (world.trackRuns) {
+        const d = find(id);
+        const run = { ...RUN, id: 9500 + id, created_at: new Date().toISOString() };
+        Object.assign(d, { status: 'running', running_device: run });
+        started.add(run.id);
+      }
       return {} as never;
     },
     stop: async (id: number, o: unknown) => {
       world.log(`rce stop ${id} ${JSON.stringify(o)}`);
+      if (world.trackRuns) Object.assign(find(id), { status: 'shutdown', running_device: null });
     },
     waitUntilReady: async (id: number) => {
+      if (world.trackRuns) {
+        await new Promise((r) => setTimeout(r, world.readyDelayMs));
+        return find(id);
+      }
       if (world.readyFails.has(id)) throw new RceError('Run did not take input within 240 s', { code: 'timeout' });
       const d = find(id);
       return { ...d, status: 'running', running_device: { ...RUN, id: 9100 + id } };
     },
     waitUntilShutdown: async (id: number) => ({ ...find(id), status: 'shutdown', running_device: null }),
-    startedHere: (d: RceDevice) => d.id === 401,
+    startedHere: (d: RceDevice) => (world.trackRuns ? !!d.running_device && started.has(d.running_device.id) : d.id === 401),
     stopStartedRuns: async () => ({ stopped: [], ended: [], failed: [] }),
     instance: (d: RceDevice) => instance(d),
   } as unknown as RceClientLike;
