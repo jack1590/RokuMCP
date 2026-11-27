@@ -5,6 +5,7 @@
 import type { Duplex } from 'stream';
 import fs from 'fs';
 import path from 'path';
+import v8 from 'v8';
 import { friendlyError, resolveTarget, type TargetParams } from '../roku-config.js';
 import { RokuError } from './errors.js';
 
@@ -147,6 +148,15 @@ export interface CaptureSummary {
 }
 
 let capture: CaptureSession | null = null;
+
+let linearEnabled = false;
+/** Turns on V8's linear-time RegExp engine (used only by regexes compiled with the 'l' flag). */
+function enableLinearRegExp(): void {
+  if (!linearEnabled) {
+    v8.setFlagsFromString('--enable-experimental-regexp-engine');
+    linearEnabled = true;
+  }
+}
 
 export function isCaptureActive(): boolean {
   return capture !== null;
@@ -292,6 +302,11 @@ export async function captureStart(options: CaptureStartOptions = {}): Promise<{
 export interface WaitOptions {
   /** JavaScript regular expression tested against each line. */
   pattern: string;
+  /**
+   * Compile with V8's linear-time engine (no backreferences or lookarounds), so a pattern cannot
+   * stall the server on a long line. roku_run sets it for snippet patterns.
+   */
+  linear?: boolean;
   timeoutMs?: number;
   predicate?: WaitPredicate;
   /** Also match lines already captured (default true). */
@@ -304,9 +319,11 @@ export async function consoleWait(options: WaitOptions): Promise<WaitResult & { 
   if (!s) throw new RokuError('no_capture', 'No active capture. Call roku_console_capture_start first.', { bare: true });
   let regex: RegExp;
   try {
-    regex = new RegExp(options.pattern);
+    if (options.linear) enableLinearRegExp();
+    regex = new RegExp(options.pattern, options.linear ? 'l' : '');
   } catch (error) {
-    throw new RokuError('bad_pattern', `Invalid pattern: ${friendlyError(error)}`, { bare: true });
+    const hint = options.linear ? ' (roku_run patterns run in linear time: no backreferences or lookarounds)' : '';
+    throw new RokuError('bad_pattern', `Invalid pattern: ${friendlyError(error)}${hint}`, { bare: true });
   }
   const predicate = options.predicate;
 

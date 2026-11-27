@@ -20,6 +20,8 @@ const SECRET_DIR = /^(\.git|\.ssh|\.aws|\.azure|\.gnupg|\.docker|\.kube|\.config
  */
 // No .md or .html: CLAUDE.md, AGENTS.md and similar files are loaded as agent instructions.
 const WRITABLE_EXT = /\.(txt|log|json|csv|tsv|xml|png|jpe?g|trace|bsprof|har|chlsj)$/i;
+/** Config files that build tools discover anywhere in a project (Nx project.json, package.json, rc files). */
+const TOOL_CONFIG = /^(package|project|tsconfig.*|jsconfig.*|deno|bunfig|lerna|nx|turbo|renovate|vercel|netlify|app|manifest|composer|.*\.config|\..*rc.*)\.json$/i;
 
 export const OUTPUT_DIR = 'roku-run';
 
@@ -96,6 +98,7 @@ export class PathPolicy {
   resolveWriteFile(p: unknown, what = 'path'): string {
     const abs = this.resolveWrite(p, what);
     if (!WRITABLE_EXT.test(abs)) throw denied(`${what} "${p}" must be a data file (.txt, .log, .json, .csv, .xml, .png, .jpg, .trace, ...), not code or Markdown`);
+    if (TOOL_CONFIG.test(path.basename(abs))) throw denied(`${what} "${p}" has the name of a tool config file; pick another name`);
     return abs;
   }
 
@@ -121,6 +124,13 @@ export class PathPolicy {
     if (typeof name !== 'string' || name === '' || name === '.' || name === '..' || /[\\/:\0]/.test(name) || isSecret(name)) {
       throw denied(`${what} must be a plain file name without folders`);
     }
+  }
+
+  /** Creates roku-run/ with a .gitignore of "*", so its files stay out of git and the tools that skip ignored files. */
+  ensureOutputDir(): void {
+    fs.mkdirSync(this.outputDir, { recursive: true });
+    const ignore = path.join(this.outputDir, '.gitignore');
+    if (!fs.existsSync(ignore)) fs.writeFileSync(ignore, '# Written by roku_run (roku-mcp code mode)\n*\n');
   }
 
   /** Whether a directory entry may be listed. */

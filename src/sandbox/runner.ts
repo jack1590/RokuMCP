@@ -43,10 +43,21 @@ function harden(): string | undefined {
   traceEvents.createTracing = () => {
     throw Object.assign(new Error('trace_events is disabled in roku_run'), { code: 'ERR_ACCESS_DENIED' });
   };
+  // --allow-natives-syntax and other V8 flags would expose engine internals.
+  const v8 = process.getBuiltinModule('node:v8') as Record<string, unknown>;
+  v8.setFlagsFromString = () => {
+    throw Object.assign(new Error('v8.setFlagsFromString is disabled in roku_run'), { code: 'ERR_ACCESS_DENIED' });
+  };
   // Make `import { setPriority } from 'node:os'` see the stubs too.
   (process.getBuiltinModule('node:module') as { syncBuiltinESMExports(): void }).syncBuiltinESMExports();
-  const left = ['kill', '_kill', '_debugProcess', '_debugEnd'].filter((k) => typeof p[k] === 'function');
+  const left = ['kill', '_kill', '_debugProcess', '_debugEnd', 'abort'].filter((k) => typeof p[k] === 'function');
   if (left.length) return `process.${left.join(', process.')} is still available`;
+  try {
+    (process.getBuiltinModule('node:v8') as { setFlagsFromString(f: string): void }).setFlagsFromString('--allow-natives-syntax');
+    return 'v8.setFlagsFromString is still available';
+  } catch {
+    // expected: the stub throws
+  }
   if (process.getBuiltinModule('node:sqlite') !== undefined) return 'node:sqlite is available';
   return undefined;
 }

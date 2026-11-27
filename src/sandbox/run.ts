@@ -134,6 +134,8 @@ class Dispatcher {
     const input = valid.data as Record<string, unknown>;
     this.defaults(command, input);
     this.checkPaths(input);
+    // A snippet's regex runs on the server's event loop: linear time only (no ReDoS).
+    if (command.name === 'console.wait' || command.name === 'console.capture') input.linear = true;
     return toPlain(await command.run(input)).data;
   }
 
@@ -146,6 +148,7 @@ class Dispatcher {
     for (const key of READ_KEYS) if (input[key] !== undefined) input[key] = this.policy.resolveRead(input[key], key);
     if (input.outDir !== undefined) input.outDir = this.policy.resolveWrite(input.outDir, 'outDir');
     if (input.file !== undefined) input.file = this.policy.resolveWriteFile(input.file, 'file');
+    if (input.outDir !== undefined || input.file !== undefined) this.policy.ensureOutputDir();
   }
 
   /** A capture with no file goes to the output folder, not ./logs. */
@@ -168,6 +171,7 @@ class Dispatcher {
         if (typeof content !== 'string') throw new RokuError('bad_args', 'roku.fs.write(path, text) takes a string.');
         if (Buffer.byteLength(content) > RUN_LIMITS.maxWriteBytes) throw new RokuError('too_large', `roku.fs.write writes at most ${RUN_LIMITS.maxWriteBytes} bytes.`);
         const abs = this.policy.resolveWriteFile(p);
+        this.policy.ensureOutputDir();
         fs.mkdirSync(path.dirname(abs), { recursive: true });
         // Check again after mkdir, and never follow a link at the final name.
         this.policy.resolveWriteFile(abs);

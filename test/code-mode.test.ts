@@ -307,3 +307,39 @@ test('review fixes 2: data-only writes, more config files, SQL gate, no priority
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('review fixes 3: linear-time patterns, no V8 flags, no tool config names, ignored output folder', { skip, timeout: 60_000 }, async () => {
+  const root = workdir();
+  try {
+    setTimeout(() => world.consoleEmit('x'.repeat(5000) + '\n'), 300);
+    const started = Date.now();
+    const r = await run(
+      `
+      const t = async (f) => { try { return await f(); } catch (e) { return e.code; } };
+      await roku.console.captureStart({ settleMs: 0 });
+      try {
+        return {
+          redos: await roku.console.wait({ pattern: '^(?:.|.|.|.|.|.|.|.)*\\\\u0001', timeoutMs: 1500 }),
+          backref: await t(() => roku.console.wait({ pattern: '(a)\\\\1', timeoutMs: 10 })),
+          v8flags: await t(() => process.getBuiltinModule('v8').setFlagsFromString('--allow-natives-syntax')),
+          pkg: await t(() => roku.fs.write('package.json', '{}')),
+          nx: await t(() => roku.fs.write('sub/project.json', '{}')),
+          rc: await t(() => roku.fs.write('.prettierrc.json', '{}')),
+          ok: (await roku.fs.write('result.json', '{}')).path,
+        };
+      } finally {
+        await roku.console.captureStop();
+      }
+    `,
+      { root, timeoutMs: 20_000 }
+    );
+    assert.equal(r.ok, true, JSON.stringify(r.error));
+    assert.ok(Date.now() - started < 10_000, 'the server was not stalled');
+    const v = r.result as Record<string, unknown>;
+    assert.equal((v.redos as { reason: string }).reason, 'timeout');
+    assert.deepEqual([v.backref, v.v8flags, v.pkg, v.nx, v.rc], ['bad_pattern', 'ERR_ACCESS_DENIED', 'path_denied', 'path_denied', 'path_denied']);
+    assert.equal(fs.readFileSync(path.join(root, 'roku-run', '.gitignore'), 'utf8').trim().endsWith('*'), true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
