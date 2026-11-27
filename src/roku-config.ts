@@ -24,6 +24,7 @@ const PASSWORD_HINT = 'set ROKU_DEVICE_PASSWORD (aliases: ROKU_DEV_PASSWORD, ROK
 /** ECP timeouts: the UI tree queries can be slow on large scenes. */
 export const ECP_TIMEOUT_MS = 10_000;
 export const ECP_TREE_TIMEOUT_MS = 30_000;
+const ECP_MAX_BYTES = 32 * 1024 * 1024;
 
 // Shared tool parameters for every device-facing tool.
 export const targetParams = {
@@ -130,10 +131,15 @@ export async function resolveTarget(params: TargetParams, options: { needPasswor
     throw new RokuError('password_required', `Roku developer password is required. Please provide the password as a parameter or ${PASSWORD_HINT}.`);
   }
   const ecp: RokuTarget['ecp'] = async (path, o) => {
+    const timeout = o?.timeoutMs ?? ECP_TIMEOUT_MS;
     const response = await axios.request({
       url: `http://${host}:8060/${path}`,
       method: o?.method ?? 'GET',
-      timeout: o?.timeoutMs ?? ECP_TIMEOUT_MS,
+      timeout,
+      // axios's timeout is an idle timeout (a host that drips bytes never trips it): the signal is
+      // wall-clock, and no ECP reply is anywhere near 32 MiB.
+      signal: AbortSignal.timeout(timeout),
+      maxContentLength: ECP_MAX_BYTES,
     });
     return typeof response.data === 'string' ? response.data : String(response.data ?? '');
   };

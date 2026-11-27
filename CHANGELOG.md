@@ -14,6 +14,9 @@
 - Limits per run: 30 s by default (300 s at most), 128 MB of heap, a 100 KiB result, 64 KiB of logs, 5,000 calls.
 - Known limits: a script can open network connections and send what it can read, and its `ArrayBuffer` memory is not capped until the timeout. A Cloud Device Run started by a script that `roku_run` kills is not stopped until the server shuts down. Code mode is not tested on Windows yet.
 
+### Fixed
+- ECP requests to a LAN device end after their timeout (10 s, or 30 s for UI tree queries) even when the device keeps sending bytes slowly, and refuse replies over 32 MiB.
+
 ### Changed
 - The tools now share one SDK (`src/sdk/`) with `rokuctl` and `roku_run`. Tool names, inputs and outputs are unchanged; a test compares 214 recorded calls and the tool list with 1.9.0.
 

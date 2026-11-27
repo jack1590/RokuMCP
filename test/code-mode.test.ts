@@ -474,3 +474,23 @@ test('review fixes 7: calls a run leaves running keep their queue slots', { skip
     server.close();
   }
 });
+
+test('review fixes 8: a LAN ECP host that drips bytes is cut off on the wall clock', { timeout: 60_000 }, async () => {
+  const http = await import('node:http');
+  const { resolveTarget } = await import('../src/roku-config.js');
+  const server = http.createServer((_req, res) => {
+    res.writeHead(200);
+    const t = setInterval(() => res.write('<'), 500);
+    res.on('close', () => clearInterval(t));
+  });
+  await new Promise<void>((r) => server.listen(8060, '127.0.0.1', () => r()));
+  try {
+    const target = await resolveTarget({ host: '127.0.0.1' });
+    const t = Date.now();
+    await assert.rejects(target.ecp('query/app-ui', { timeoutMs: 1500 }));
+    assert.ok(Date.now() - t < 4000, `held for ${Date.now() - t} ms`);
+  } finally {
+    server.closeAllConnections();
+    server.close();
+  }
+});
