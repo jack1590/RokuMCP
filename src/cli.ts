@@ -15,7 +15,7 @@ import path from 'path';
 import { z } from 'zod';
 import { COMMANDS, commandShape, commandSummary, findCommand, parseCommandInput, type Command } from './commands.js';
 import { describeError } from './sdk/describe.js';
-import { jsonify } from './sdk/json.js';
+import { jsonify, toPlain } from './sdk/json.js';
 import { stopStartedRuns } from './rce.js';
 
 export const MAX_STDOUT_BYTES = 64 * 1024;
@@ -148,21 +148,6 @@ export function parseArgs(argv: string[]): ParsedArgs {
   return { command, input, out, timeoutMs };
 }
 
-/** Replaces Buffers with a byte count, returning the first one so --out can write it. */
-function stripBinary(value: unknown): { data: unknown; binary?: Buffer } {
-  let binary: Buffer | undefined;
-  const walk = (v: unknown): unknown => {
-    if (Buffer.isBuffer(v)) {
-      binary ??= v;
-      return { binary: true, bytes: v.length };
-    }
-    if (Array.isArray(v)) return v.map(walk);
-    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)]));
-    return v;
-  };
-  return { data: walk(value), binary };
-}
-
 const success = (data: unknown): Output => ({ exitCode: 0, stdout: jsonify({ ok: true, data: data ?? null }, 0) });
 const failure = (exitCode: number, code: string, message: string): Output => ({ exitCode, stdout: jsonify({ ok: false, error: { code, message } }, 0) });
 
@@ -217,7 +202,7 @@ export async function runCli(argv: string[]): Promise<Output> {
     return failure(info.code === 'timeout' ? 3 : 1, info.code, info.message);
   }
 
-  const { data, binary } = stripBinary(result);
+  const { data, binary } = toPlain(result);
   if (parsed.out) {
     const body = binary ?? (typeof data === 'string' ? data : jsonify(data));
     try {

@@ -32,6 +32,8 @@ Cut the context an agent spends on roku-mcp. Today every session loads 46 tool d
 
 ## Phase 3: Skills (light review)
 
+Run after phase 4, so the skills can use `roku_run` as built.
+
 1. Rewrite `plugin/skills/*` as task-level skills: "reproduce a bug on screen", "run an end-to-end check", "profile a memory leak", "diagnose a stream", "use a Cloud Device". Each has numbered steps that use `rokuctl` or `roku_run`, and an error-recovery table (symptom, cause, fix).
 2. Remove references to tool sequences that code mode replaces. Keep the full-mode tool names only where a step still needs them.
 3. A test greps skills, `AGENTS.md`, `README.md` and `rules/*` for `roku_*` names and fails on any name the server does not register.

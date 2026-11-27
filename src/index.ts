@@ -4,14 +4,29 @@ import './env.js';
 import { createRequire } from 'module';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { TOOL_GROUPS } from './tools/index.js';
+import { registerCodeTools } from './tools/code.js';
+import { registerScreenshotTools } from './tools/screenshot.js';
 import { stopStartedRuns } from './rce.js';
 
 const { version } = createRequire(import.meta.url)('../package.json') as { version: string };
 
-/** Registers every tool on a new McpServer. */
-export function buildServer(): McpServer {
+export type ServerMode = 'full' | 'code';
+
+/** ROKU_MCP_MODE=code selects code mode; anything else is the full tool set. */
+export const serverMode = (env: NodeJS.ProcessEnv = process.env): ServerMode => (env.ROKU_MCP_MODE?.trim().toLowerCase() === 'code' ? 'code' : 'full');
+
+/**
+ * Full mode registers every tool. Code mode registers roku_run, roku_sdk_docs and roku_screenshot
+ * (an image cannot come back from a script).
+ */
+export function buildServer(mode: ServerMode = serverMode()): McpServer {
   const server = new McpServer({ name: 'roku-mcp', version });
-  for (const register of TOOL_GROUPS) register(server);
+  if (mode === 'code') {
+    registerCodeTools(server);
+    registerScreenshotTools(server);
+  } else {
+    for (const register of TOOL_GROUPS) register(server);
+  }
   return server;
 }
 

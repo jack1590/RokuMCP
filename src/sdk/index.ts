@@ -5,6 +5,7 @@
  * and throw RokuError for expected failures and the underlying error otherwise.
  */
 import type { TargetParams } from '../roku-config.js';
+import { withDefaults } from './defaults.js';
 import * as device from './device.js';
 import * as input from './input.js';
 import * as ui from './ui.js';
@@ -40,16 +41,6 @@ export { analyzeProfile, compareProfiles, readHeaderInfo } from './profiler.js';
 export { perfettoEnable, perfettoStart, perfettoStop, analyzeTrace, compareTraces, queryTrace } from './perfetto.js';
 export { diagnoseStream } from './stream.js';
 export { listCloudDevices, cloudStatus, cloudStart, cloudStop } from './rce.js';
-
-/**
- * The options a call runs with: undefined values are dropped, and a call that names its own
- * host or rceDevice replaces the whole default target (password included), so host cannot win
- * over a per-call rceDevice by precedence.
- */
-function withDefaults<O extends object>(defaults: TargetParams, options?: O): O {
-  const given = Object.fromEntries(Object.entries(options ?? {}).filter(([, v]) => v !== undefined)) as O & TargetParams;
-  return { ...(given.host || given.rceDevice ? {} : defaults), ...given } as O;
-}
 
 /** Binds default target options (host, rceDevice, password) to a function's options object. */
 function bind<O extends object, R>(defaults: TargetParams, fn: (options: O) => R): (options?: Partial<TargetParams> & O) => R {
