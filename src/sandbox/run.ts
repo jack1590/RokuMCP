@@ -29,8 +29,10 @@ export const RUN_LIMITS = {
   maxParseBytes: 5 * 1024 * 1024,
   /** Calls running at once across all runs; more wait in a queue (CPU-heavy parses cannot pile up). */
   maxInFlight: 2,
-  /** Longest a call holds a queue slot. */
+  /** Longest a call holds a work slot. */
   maxSlotMs: 60_000,
+  /** Waits (sleep, console wait, observe, Cloud Device start/stop) running at once across all runs. */
+  maxWaits: 8,
 };
 
 /** Node's permission model without the experimental flag: 22.13+ (and 23.5+). */
@@ -112,11 +114,31 @@ function childEnv(): NodeJS.ProcessEnv {
   return process.platform === 'win32' && process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {};
 }
 
-/** Calls that only wait (device, console, observer): they skip the queue. */
+/** Calls that only wait (device, console, observer, Cloud Device start/stop): they use the wait lane. */
 const WAIT_CALLS = new Set(['device.sleep', 'console.wait', 'console.capture', 'console.captureStart', 'rta.observe', 'rce.start', 'rce.stop']);
 
-/** One queue for every roku_run in this server: parallel runs cannot add up CPU-heavy calls. */
-const slots: { inFlight: number; queue: Array<{ owner: Dispatcher; resolve: () => void }> } = { inFlight: 0, queue: [] };
+interface Lane {
+  max: number;
+  /** Longest a call holds a slot; then it stops counting, so one hung call cannot block every later run. */
+  holdMs: number;
+  inFlight: number;
+  queue: Array<{ owner: Dispatcher; resolve: () => void }>;
+}
+
+/**
+ * Server-wide lanes shared by every roku_run: CPU or I/O work, and waits. Parallel runs cannot add up
+ * parses, and waits (which hold sockets for minutes) are bounded too.
+ */
+const LANES: Record<'work' | 'wait', Lane> = {
+  work: { max: RUN_LIMITS.maxInFlight, holdMs: RUN_LIMITS.maxSlotMs, inFlight: 0, queue: [] },
+  wait: { max: RUN_LIMITS.maxWaits, holdMs: RUN_LIMITS.maxTimeoutMs + 10_000, inFlight: 0, queue: [] },
+};
+
+/** A LAN host as an address only: no port or path, so a script cannot aim a call at any service. */
+const PLAIN_HOST = /^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,62})(?:\.[A-Za-z0-9-]{1,63})*|\[[0-9A-Fa-f:.]+\]|[0-9A-Fa-f:]+:[0-9A-Fa-f:.]*)$/;
+
+/** Wait options a script may set, capped at the longest run. */
+const WAIT_KEYS = ['timeoutMs', 'durationMs', 'settleMs'];
 
 class Dispatcher {
   calls = 0;
@@ -124,25 +146,23 @@ class Dispatcher {
   /** Set when the run's result is decided: its queued calls are dropped, not started. */
   closed = false;
 
-  /** Runs dispatch through the server-wide queue (at most RUN_LIMITS.maxInFlight calls at once). */
+  /** Runs dispatch in its lane (at most lane.max calls at once across all runs). */
   async enqueue(name: unknown, args: unknown): Promise<unknown> {
-    // Waits use no CPU and may last minutes: they must not hold a slot other runs need.
-    if (typeof name === 'string' && WAIT_CALLS.has(name)) return this.dispatch(name, args);
-    while (slots.inFlight >= RUN_LIMITS.maxInFlight && !this.closed) await new Promise<void>((resolve) => slots.queue.push({ owner: this, resolve }));
+    const lane = typeof name === 'string' && WAIT_CALLS.has(name) ? LANES.wait : LANES.work;
+    while (lane.inFlight >= lane.max && !this.closed) await new Promise<void>((resolve) => lane.queue.push({ owner: this, resolve }));
     if (this.closed) throw new RokuError('run_ended', 'The run ended before this call started.');
     // The slot is freed when the call really finishes, even after its run ended (a script that
-    // returns without awaiting must not get fresh slots), or after RUN_LIMITS.maxSlotMs at most,
-    // so one hung call cannot block every later run.
-    slots.inFlight++;
+    // returns without awaiting must not get fresh slots), or after lane.holdMs at most.
+    lane.inFlight++;
     let held = true;
     const release = () => {
       if (!held) return;
       held = false;
-      slots.inFlight--;
+      lane.inFlight--;
       // Wake one waiter per freed slot, after an event-loop turn so a run's timeout can fire.
-      setImmediate(() => slots.queue.shift()?.resolve());
+      setImmediate(() => lane.queue.shift()?.resolve());
     };
-    const cap = setTimeout(release, RUN_LIMITS.maxSlotMs);
+    const cap = setTimeout(release, lane.holdMs);
     cap.unref();
     try {
       return await this.dispatch(name, args);
@@ -154,8 +174,10 @@ class Dispatcher {
 
   close(): void {
     this.closed = true;
-    for (let i = slots.queue.length - 1; i >= 0; i--) {
-      if (slots.queue[i].owner === this) slots.queue.splice(i, 1)[0].resolve();
+    for (const lane of Object.values(LANES)) {
+      for (let i = lane.queue.length - 1; i >= 0; i--) {
+        if (lane.queue[i].owner === this) lane.queue.splice(i, 1)[0].resolve();
+      }
     }
   }
 
@@ -185,6 +207,12 @@ class Dispatcher {
       throw new RokuError('bad_args', `Invalid options for roku.${name}: ${issues}`);
     }
     const input = valid.data as Record<string, unknown>;
+    if (input.host !== undefined && !PLAIN_HOST.test(String(input.host))) {
+      throw new RokuError('bad_args', 'host must be an IP address or host name, without a port or path.');
+    }
+    for (const key of WAIT_KEYS) {
+      if (typeof input[key] === 'number') input[key] = Math.min(input[key] as number, RUN_LIMITS.maxTimeoutMs);
+    }
     this.defaults(command, input);
     this.checkPaths(input);
     // bsprof-cli matches this glob with minimatch for every record; even plain * globs backtrack

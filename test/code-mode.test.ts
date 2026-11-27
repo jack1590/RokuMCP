@@ -487,10 +487,49 @@ test('review fixes 8: a LAN ECP host that drips bytes is cut off on the wall clo
   try {
     const target = await resolveTarget({ host: '127.0.0.1' });
     const t = Date.now();
-    await assert.rejects(target.ecp('query/app-ui', { timeoutMs: 1500 }));
+    await assert.rejects(target.ecp('query/app-ui', { timeoutMs: 1500 }), (e: Error & { code?: string }) => e.message === 'timeout of 1500ms exceeded' && e.code === 'ECONNABORTED');
     assert.ok(Date.now() - t < 4000, `held for ${Date.now() - t} ms`);
   } finally {
     server.closeAllConnections();
     server.close();
+  }
+});
+
+test('review fixes 9: plain hosts only, bounded RTA frames and console lines', { skip, timeout: 60_000 }, async () => {
+  const net = await import('node:net');
+  let r = await run(`const t = async (f) => { try { return await f(); } catch (e) { return e.code; } };
+    return [await t(() => roku.device.info({ host: '127.0.0.1:8081/r?' })), await t(() => roku.device.info({ host: 'a b' }))];`);
+  assert.deepEqual(r.result, ['bad_args', 'bad_args']);
+  r = await runSnippet({ code: 'return 1', host: '127.0.0.1:9' });
+  assert.equal(r.ok, true, 'the run itself starts; its device calls are refused');
+
+  // RTA: a header announcing a huge frame closes the connection instead of buffering.
+  const rta = net.createServer((sock) => {
+    sock.on('data', () => {
+      const h = Buffer.alloc(8);
+      h.writeInt32LE(2_000_000_000, 0);
+      sock.write(h);
+    });
+  });
+  await new Promise<void>((res) => rta.listen(9000, '127.0.0.1', () => res()));
+  try {
+    const { getValue } = await import('../src/sdk/rta.js');
+    await assert.rejects(getValue({ host: '127.0.0.1', keyPath: 'a.b' }), /socket closed/);
+  } finally {
+    rta.close();
+  }
+
+  // A console line that never ends is matched in 64 KiB pieces, not held whole.
+  const con = await import('../src/sdk/console.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'roku-cap-'));
+  try {
+    await con.captureStart({ rceDevice: '400', file: path.join(dir, 'c.log'), settleMs: 0 });
+    world.consoleEmit('y'.repeat(200_000));
+    await new Promise((res) => setTimeout(res, 100));
+    assert.ok((con.captureStatus() as { lines: number }).lines >= 1, 'long unfinished line was split');
+    await con.captureStop();
+    assert.equal(fs.readFileSync(path.join(dir, 'c.log'), 'utf8').length, 200_000, 'the file keeps every byte');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });

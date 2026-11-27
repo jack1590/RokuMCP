@@ -54,6 +54,7 @@ interface PendingRequest {
 }
 
 const HEADER_SIZE = 8;
+const MAX_FRAME_BYTES = 16 * 1024 * 1024;
 
 class RtaClient {
   private socket: Duplex;
@@ -105,9 +106,16 @@ class RtaClient {
           this.leftover = buf;
           return;
         }
+        const stringLength = buf.readInt32LE(0);
+        const binaryLength = buf.readInt32LE(4);
+        // A real reply is small; a bogus header must not make us buffer without bound.
+        if (stringLength < 0 || binaryLength < 0 || stringLength + binaryLength > MAX_FRAME_BYTES) {
+          this.socket.destroy();
+          return;
+        }
         this.incoming = {
-          stringLength: buf.readInt32LE(0),
-          binaryLength: buf.readInt32LE(4),
+          stringLength,
+          binaryLength,
           stringPayload: '',
           binaryReceived: 0,
         };

@@ -13,6 +13,9 @@ const CONSOLE_PORT = 8085;
 const MAX_KEPT_LINES = 50_000;
 const PREVIEW_CHARS = 240;
 const WAITING_FOR_DEBUGGER = /Waiting for debugger on/;
+const MAX_PENDING_CHARS = 64 * 1024;
+/** The single-shot connection keeps the newest output only. */
+const MAX_SESSION_CHARS = 1024 * 1024;
 
 const CAPTURE_ACTIVE =
   'A console capture is active and holds port 8085 (single client). Use roku_console_wait, or read the capture file; stop it with roku_console_capture_stop to use the single-shot console tools again.';
@@ -42,7 +45,7 @@ export async function consoleConnect(options: TargetParams & { port?: number } =
   const newSession: ConsoleSession = { socket, buffer: '', host: target.label, connected: true };
   session = newSession;
   socket.on('data', (data) => {
-    if (session === newSession) session.buffer += data.toString();
+    if (session === newSession) session.buffer = (session.buffer + data.toString()).slice(-MAX_SESSION_CHARS);
   });
   socket.on('close', () => {
     if (session === newSession) session.connected = false;
@@ -275,6 +278,11 @@ export async function captureStart(options: CaptureStartOptions = {}): Promise<{
       const split = splitLines(s.pending, text);
       s.pending = split.pending;
       for (const line of split.lines) onLine(s, line);
+      // A line that never ends is matched in pieces rather than held without bound (the file keeps all of it).
+      if (s.pending.length > MAX_PENDING_CHARS) {
+        onLine(s, s.pending);
+        s.pending = '';
+      }
     });
     socket.on('close', () => {
       if (capture === s) void endCapture(s);

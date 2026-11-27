@@ -132,15 +132,22 @@ export async function resolveTarget(params: TargetParams, options: { needPasswor
   }
   const ecp: RokuTarget['ecp'] = async (path, o) => {
     const timeout = o?.timeoutMs ?? ECP_TIMEOUT_MS;
-    const response = await axios.request({
-      url: `http://${host}:8060/${path}`,
-      method: o?.method ?? 'GET',
-      timeout,
-      // axios's timeout is an idle timeout (a host that drips bytes never trips it): the signal is
-      // wall-clock, and no ECP reply is anywhere near 32 MiB.
-      signal: AbortSignal.timeout(timeout),
-      maxContentLength: ECP_MAX_BYTES,
-    });
+    let response;
+    try {
+      response = await axios.request({
+        url: `http://${host}:8060/${path}`,
+        method: o?.method ?? 'GET',
+        timeout,
+        // axios's timeout is an idle timeout (a host that drips bytes never trips it): the signal is a
+        // wall-clock backstop a little later, and no ECP reply is anywhere near 32 MiB.
+        signal: AbortSignal.timeout(timeout + 1000),
+        maxContentLength: ECP_MAX_BYTES,
+      });
+    } catch (error) {
+      // Report the backstop like axios's own timeout, so the messages stay as before.
+      if (axios.isCancel(error)) throw Object.assign(new Error(`timeout of ${timeout}ms exceeded`), { code: 'ECONNABORTED' });
+      throw error;
+    }
     return typeof response.data === 'string' ? response.data : String(response.data ?? '');
   };
   return {

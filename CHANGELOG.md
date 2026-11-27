@@ -15,7 +15,8 @@
 - Known limits: a script can open network connections and send what it can read, and its `ArrayBuffer` memory is not capped until the timeout. A Cloud Device Run started by a script that `roku_run` kills is not stopped until the server shuts down. Code mode is not tested on Windows yet.
 
 ### Fixed
-- ECP requests to a LAN device end after their timeout (10 s, or 30 s for UI tree queries) even when the device keeps sending bytes slowly, and refuse replies over 32 MiB.
+- ECP requests to a LAN device end after their timeout (10 s, or 30 s for UI tree queries) even when the device keeps sending bytes slowly, and refuse replies over 32 MiB. The error text is unchanged.
+- The RTA client closes the connection on a reply frame over 16 MiB instead of buffering it, a console capture matches a line that never ends in 64 KiB pieces (the file still keeps every byte), and the single-shot console keeps the newest 1 MiB.
 
 ### Changed
 - The tools now share one SDK (`src/sdk/`) with `rokuctl` and `roku_run`. Tool names, inputs and outputs are unchanged; a test compares 214 recorded calls and the tool list with 1.9.0.
