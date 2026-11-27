@@ -1,0 +1,4142 @@
+[
+  {
+    "name": "lan keypress",
+    "tool": "roku_keypress",
+    "args": {
+      "host": "127.0.0.1",
+      "key": "Home"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Key press sent: Home"
+        }
+      ]
+    },
+    "calls": [
+      "ecp POST keypress/Home"
+    ]
+  },
+  {
+    "name": "lan keypress literal percent",
+    "tool": "roku_keypress",
+    "args": {
+      "host": "127.0.0.1",
+      "key": "Lit_%"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Key press sent: Lit_%"
+        }
+      ]
+    },
+    "calls": [
+      "ecp POST keypress/Lit_%25"
+    ]
+  },
+  {
+    "name": "lan key sequence",
+    "tool": "roku_keypress_sequence",
+    "args": {
+      "host": "127.0.0.1",
+      "keys": [
+        "Up",
+        "Down",
+        "Select"
+      ],
+      "delayMs": 0
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Key sequence sent: Up, Down, Select"
+        }
+      ]
+    },
+    "calls": [
+      "ecp POST keypress/Up",
+      "ecp POST keypress/Down",
+      "ecp POST keypress/Select"
+    ]
+  },
+  {
+    "name": "lan type text",
+    "tool": "roku_type_text",
+    "args": {
+      "host": "127.0.0.1",
+      "text": "a b&",
+      "delayMs": 0
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Typed 4 characters"
+        }
+      ]
+    },
+    "calls": [
+      "ecp POST keypress/Lit_a",
+      "ecp POST keypress/Lit_%20",
+      "ecp POST keypress/Lit_b",
+      "ecp POST keypress/Lit_%26"
+    ]
+  },
+  {
+    "name": "lan launch with params",
+    "tool": "roku_launch",
+    "args": {
+      "host": "127.0.0.1",
+      "appId": "dev",
+      "params": {
+        "contentId": "42",
+        "mediaType": "movie"
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Launched app dev on 127.0.0.1"
+        }
+      ]
+    },
+    "calls": [
+      "ecp POST launch/dev?contentId=42&mediaType=movie"
+    ]
+  },
+  {
+    "name": "lan launch restart",
+    "tool": "roku_launch",
+    "args": {
+      "host": "127.0.0.1",
+      "appId": "dev",
+      "restart": true
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Launched app dev on 127.0.0.1"
+        }
+      ]
+    },
+    "calls": [
+      "ecp POST exit-app/dev",
+      "ecp POST launch/dev"
+    ]
+  },
+  {
+    "name": "lan launch restart, exit-app fails",
+    "tool": "roku_launch",
+    "args": {
+      "host": "127.0.0.1",
+      "appId": "dev",
+      "restart": true
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Launched app dev on 127.0.0.1"
+        }
+      ]
+    },
+    "calls": [
+      "ecp POST exit-app/dev",
+      "ecp POST keypress/Home",
+      "ecp POST launch/dev"
+    ]
+  },
+  {
+    "name": "lan device info",
+    "tool": "roku_query_device_info",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"device-info\": {\n    \"model-name\": \"Roku Ultra\",\n    \"software-version\": \"15.1.4\",\n    \"serial-number\": \"X0001\"\n  }\n}"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/device-info"
+    ]
+  },
+  {
+    "name": "lan active app",
+    "tool": "roku_query_active_app",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"active-app\": {\n    \"app\": {\n      \"#text\": \"Parity\",\n      \"@_id\": \"dev\",\n      \"@_type\": \"appl\",\n      \"@_version\": \"1.0.0\"\n    }\n  }\n}"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/active-app"
+    ]
+  },
+  {
+    "name": "lan media player",
+    "tool": "roku_query_media_player",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"player\": {\n    \"format\": {\n      \"@_audio\": \"aac\",\n      \"@_video\": \"mpeg4 avc\"\n    },\n    \"position\": \"1500 ms\",\n    \"duration\": \"60000 ms\",\n    \"@_error\": \"false\",\n    \"@_state\": \"play\"\n  }\n}"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/media-player"
+    ]
+  },
+  {
+    "name": "lan media player 403",
+    "tool": "roku_query_media_player",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Query media player failed: Access denied by the Roku device. Make sure Developer Mode is enabled and the password is correct."
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "ecp GET query/media-player"
+    ]
+  },
+  {
+    "name": "lan app ui",
+    "tool": "roku_query_app_ui",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<app-ui>\n  <topscreen>\n    <plugin id=\"dev\" name=\"Parity\"/>\n    <screen focused=\"true\" type=\"RoScreen\">\n      <MainScene name=\"MainScene\" uiElementId=\"RTA_1\" focused=\"true\">\n        <Label name=\"title\" uiElementId=\"RTA_2\" text=\"Hello\" visible=\"true\" bounds=\"{0, 0, 100, 20}\"/>\n        <Group id=\"menu\" name=\"menu\" uiElementId=\"RTA_3\">\n          <Button name=\"play\" uiElementId=\"RTA_4\" text=\"Play\" focused=\"true\"/>\n          <Button name=\"info\" uiElementId=\"RTA_5\" text=\"Info\"/>\n        </Group>\n      </MainScene>\n    </screen>\n  </topscreen>\n</app-ui>"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui"
+    ]
+  },
+  {
+    "name": "lan app ui 404",
+    "tool": "roku_query_app_ui",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Query app UI failed: No dev channel is running (the device answered 404 to query/app-ui). Deploy one with roku_deploy first."
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "ecp GET query/app-ui"
+    ]
+  },
+  {
+    "name": "lan app ui 403",
+    "tool": "roku_query_app_ui",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Query app UI failed: Access denied by the Roku device. Make sure Developer Mode is enabled and the password is correct."
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "ecp GET query/app-ui"
+    ]
+  },
+  {
+    "name": "lan app ui 401",
+    "tool": "roku_query_app_ui",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Query app UI failed: Authentication failed — the Roku developer password is incorrect. Please provide the correct password."
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "ecp GET query/app-ui"
+    ]
+  },
+  {
+    "name": "lan app ui 500",
+    "tool": "roku_query_app_ui",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Query app UI failed: Request failed with status code 500"
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "ecp GET query/app-ui"
+    ]
+  },
+  {
+    "name": "lan sg nodes all",
+    "tool": "roku_query_sg_nodes",
+    "args": {
+      "host": "127.0.0.1",
+      "type": "all"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "<sgnodes><All><MainScene/></All></sgnodes>"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/sgnodes/all"
+    ]
+  },
+  {
+    "name": "lan sg nodes roots",
+    "tool": "roku_query_sg_nodes",
+    "args": {
+      "host": "127.0.0.1",
+      "type": "roots"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "<sgnodes><Roots><MainScene/><RTA_OnDeviceComponent/></Roots></sgnodes>"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/sgnodes/roots"
+    ]
+  },
+  {
+    "name": "lan sg nodes node",
+    "tool": "roku_query_sg_nodes",
+    "args": {
+      "host": "127.0.0.1",
+      "type": "node",
+      "nodeId": "RTA_2"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "<sgnodes><Label name=\"title\"/></sgnodes>"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/sgnodes/nodes/RTA_2"
+    ]
+  },
+  {
+    "name": "lan sg nodes node without id",
+    "tool": "roku_query_sg_nodes",
+    "args": {
+      "host": "127.0.0.1",
+      "type": "node"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "nodeId is required when type is \"node\""
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "lan sg nodes 404",
+    "tool": "roku_query_sg_nodes",
+    "args": {
+      "host": "127.0.0.1",
+      "type": "all"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Query SG nodes failed: Request failed with status code 404"
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "ecp GET query/sgnodes/all"
+    ]
+  },
+  {
+    "name": "lan find node by id",
+    "tool": "roku_find_node",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "menu"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"menu\",\n  \"name\": \"menu\",\n  \"uiElementId\": \"RTA_3\"\n}"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui"
+    ]
+  },
+  {
+    "name": "lan find node by name",
+    "tool": "roku_find_node",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "title"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"name\": \"title\",\n  \"uiElementId\": \"RTA_2\",\n  \"text\": \"Hello\",\n  \"visible\": \"true\",\n  \"bounds\": \"{0, 0, 100, 20}\"\n}"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui"
+    ]
+  },
+  {
+    "name": "lan find node by attr",
+    "tool": "roku_find_node",
+    "args": {
+      "host": "127.0.0.1",
+      "attr": "text",
+      "value": "Play"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"name\": \"play\",\n  \"uiElementId\": \"RTA_4\",\n  \"text\": \"Play\",\n  \"focused\": \"true\"\n}"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui"
+    ]
+  },
+  {
+    "name": "lan find node by prefixed attr, many",
+    "tool": "roku_find_node",
+    "args": {
+      "host": "127.0.0.1",
+      "attr": "@_name",
+      "value": "MainScene"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"name\": \"MainScene\",\n  \"uiElementId\": \"RTA_1\",\n  \"focused\": \"true\"\n}"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui"
+    ]
+  },
+  {
+    "name": "lan find node by subtype attr, many",
+    "tool": "roku_find_node",
+    "args": {
+      "host": "127.0.0.1",
+      "attr": "focused",
+      "value": "true"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "[\n  {\n    \"focused\": \"true\",\n    \"type\": \"RoScreen\"\n  },\n  {\n    \"name\": \"MainScene\",\n    \"uiElementId\": \"RTA_1\",\n    \"focused\": \"true\"\n  },\n  {\n    \"name\": \"play\",\n    \"uiElementId\": \"RTA_4\",\n    \"text\": \"Play\",\n    \"focused\": \"true\"\n  }\n]"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui"
+    ]
+  },
+  {
+    "name": "lan find node none",
+    "tool": "roku_find_node",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "nothing"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "No node found with id or name \"nothing\" in the current UI tree."
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui"
+    ]
+  },
+  {
+    "name": "lan find node none by attr",
+    "tool": "roku_find_node",
+    "args": {
+      "host": "127.0.0.1",
+      "attr": "text",
+      "value": "Nope"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "No node found with text=\"Nope\" in the current UI tree."
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui"
+    ]
+  },
+  {
+    "name": "lan find node missing args",
+    "tool": "roku_find_node",
+    "args": {
+      "host": "127.0.0.1",
+      "attr": "text"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Provide either nodeId, or both attr and value to search for a node."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "lan find node 404",
+    "tool": "roku_find_node",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "menu"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Find node failed: No dev channel is running (the device answered 404 to query/app-ui). Deploy one with roku_deploy first."
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "ecp GET query/app-ui"
+    ]
+  },
+  {
+    "name": "lan focused node",
+    "tool": "roku_get_focused_node",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"focused\": \"true\",\n  \"type\": \"RoScreen\"\n}"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui"
+    ]
+  },
+  {
+    "name": "lan focused node 404",
+    "tool": "roku_get_focused_node",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Get focused node failed: No dev channel is running (the device answered 404 to query/app-ui). Deploy one with roku_deploy first."
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "ecp GET query/app-ui"
+    ]
+  },
+  {
+    "name": "rce keypress",
+    "tool": "roku_keypress",
+    "args": {
+      "rceDevice": "400",
+      "key": "Home"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Key press sent: Home"
+        }
+      ]
+    },
+    "calls": [
+      "rce keypress Home"
+    ]
+  },
+  {
+    "name": "rce keypress literal percent",
+    "tool": "roku_keypress",
+    "args": {
+      "rceDevice": "400",
+      "key": "Lit_%"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Key press sent: Lit_%"
+        }
+      ]
+    },
+    "calls": [
+      "rce keypress Lit_%25"
+    ]
+  },
+  {
+    "name": "rce key sequence",
+    "tool": "roku_keypress_sequence",
+    "args": {
+      "rceDevice": "400",
+      "keys": [
+        "Up",
+        "Down",
+        "Select"
+      ],
+      "delayMs": 0
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Key sequence sent: Up, Down, Select"
+        }
+      ]
+    },
+    "calls": [
+      "rce keypress Up",
+      "rce keypress Down",
+      "rce keypress Select"
+    ]
+  },
+  {
+    "name": "rce type text",
+    "tool": "roku_type_text",
+    "args": {
+      "rceDevice": "400",
+      "text": "a b&",
+      "delayMs": 0
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Typed 4 characters"
+        }
+      ]
+    },
+    "calls": [
+      "rce keypress Lit_a",
+      "rce keypress Lit_ ",
+      "rce keypress Lit_b",
+      "rce keypress Lit_&"
+    ]
+  },
+  {
+    "name": "rce launch with params",
+    "tool": "roku_launch",
+    "args": {
+      "rceDevice": "400",
+      "appId": "dev",
+      "params": {
+        "contentId": "42",
+        "mediaType": "movie"
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Launched app dev on Cloud Device 400 (Parity_1)"
+        }
+      ]
+    },
+    "calls": [
+      "ecp POST launch/dev?contentId=42&mediaType=movie",
+      "rce ecp timeout 10000"
+    ]
+  },
+  {
+    "name": "rce launch restart",
+    "tool": "roku_launch",
+    "args": {
+      "rceDevice": "400",
+      "appId": "dev",
+      "restart": true
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Launched app dev on Cloud Device 400 (Parity_1)"
+        }
+      ]
+    },
+    "calls": [
+      "ecp POST exit-app/dev",
+      "rce ecp timeout 10000",
+      "ecp POST launch/dev",
+      "rce ecp timeout 10000"
+    ]
+  },
+  {
+    "name": "rce launch restart, exit-app fails",
+    "tool": "roku_launch",
+    "args": {
+      "rceDevice": "400",
+      "appId": "dev",
+      "restart": true
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Launched app dev on Cloud Device 400 (Parity_1)"
+        }
+      ]
+    },
+    "calls": [
+      "ecp POST exit-app/dev",
+      "rce ecp timeout 10000",
+      "rce keypress Home",
+      "ecp POST launch/dev",
+      "rce ecp timeout 10000"
+    ]
+  },
+  {
+    "name": "rce device info",
+    "tool": "roku_query_device_info",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"device-info\": {\n    \"model-name\": \"Roku Ultra\",\n    \"software-version\": \"15.1.4\",\n    \"serial-number\": \"X0001\"\n  }\n}"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/device-info",
+      "rce ecp timeout 10000"
+    ]
+  },
+  {
+    "name": "rce active app",
+    "tool": "roku_query_active_app",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"active-app\": {\n    \"app\": {\n      \"#text\": \"Parity\",\n      \"@_id\": \"dev\",\n      \"@_type\": \"appl\",\n      \"@_version\": \"1.0.0\"\n    }\n  }\n}"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/active-app",
+      "rce ecp timeout 10000"
+    ]
+  },
+  {
+    "name": "rce media player",
+    "tool": "roku_query_media_player",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"player\": {\n    \"format\": {\n      \"@_audio\": \"aac\",\n      \"@_video\": \"mpeg4 avc\"\n    },\n    \"position\": \"1500 ms\",\n    \"duration\": \"60000 ms\",\n    \"@_error\": \"false\",\n    \"@_state\": \"play\"\n  }\n}"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/media-player",
+      "rce ecp timeout 10000"
+    ]
+  },
+  {
+    "name": "rce media player 403",
+    "tool": "roku_query_media_player",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Query media player failed: ECP command not allowed in Limited mode. (RCE: ecp_forbidden)"
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "ecp GET query/media-player",
+      "rce ecp timeout 10000"
+    ]
+  },
+  {
+    "name": "rce app ui",
+    "tool": "roku_query_app_ui",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<app-ui>\n  <topscreen>\n    <plugin id=\"dev\" name=\"Parity\"/>\n    <screen focused=\"true\" type=\"RoScreen\">\n      <MainScene name=\"MainScene\" uiElementId=\"RTA_1\" focused=\"true\">\n        <Label name=\"title\" uiElementId=\"RTA_2\" text=\"Hello\" visible=\"true\" bounds=\"{0, 0, 100, 20}\"/>\n        <Group id=\"menu\" name=\"menu\" uiElementId=\"RTA_3\">\n          <Button name=\"play\" uiElementId=\"RTA_4\" text=\"Play\" focused=\"true\"/>\n          <Button name=\"info\" uiElementId=\"RTA_5\" text=\"Info\"/>\n        </Group>\n      </MainScene>\n    </screen>\n  </topscreen>\n</app-ui>"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce app ui 404",
+    "tool": "roku_query_app_ui",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Query app UI failed: No dev channel is running (the device answered 404 to query/app-ui). Deploy one with roku_deploy first."
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "ecp GET query/app-ui",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce app ui 403",
+    "tool": "roku_query_app_ui",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Query app UI failed: ECP command not allowed in Limited mode. (RCE: ecp_forbidden)"
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "ecp GET query/app-ui",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce app ui 401",
+    "tool": "roku_query_app_ui",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Query app UI failed: ECP query/app-ui answered 401"
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "ecp GET query/app-ui",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce app ui 500",
+    "tool": "roku_query_app_ui",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Query app UI failed: ECP query/app-ui answered 500"
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "ecp GET query/app-ui",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce sg nodes all",
+    "tool": "roku_query_sg_nodes",
+    "args": {
+      "rceDevice": "400",
+      "type": "all"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "<sgnodes><All><MainScene/></All></sgnodes>"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/sgnodes/all",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce sg nodes roots",
+    "tool": "roku_query_sg_nodes",
+    "args": {
+      "rceDevice": "400",
+      "type": "roots"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "<sgnodes><Roots><MainScene/><RTA_OnDeviceComponent/></Roots></sgnodes>"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/sgnodes/roots",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce sg nodes node",
+    "tool": "roku_query_sg_nodes",
+    "args": {
+      "rceDevice": "400",
+      "type": "node",
+      "nodeId": "RTA_2"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "<sgnodes><Label name=\"title\"/></sgnodes>"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/sgnodes/nodes/RTA_2",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce sg nodes node without id",
+    "tool": "roku_query_sg_nodes",
+    "args": {
+      "rceDevice": "400",
+      "type": "node"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "nodeId is required when type is \"node\""
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "rce sg nodes 404",
+    "tool": "roku_query_sg_nodes",
+    "args": {
+      "rceDevice": "400",
+      "type": "all"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Query SG nodes failed: ECP query/sgnodes/all answered 404"
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "ecp GET query/sgnodes/all",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce find node by id",
+    "tool": "roku_find_node",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "menu"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"menu\",\n  \"name\": \"menu\",\n  \"uiElementId\": \"RTA_3\"\n}"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce find node by name",
+    "tool": "roku_find_node",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "title"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"name\": \"title\",\n  \"uiElementId\": \"RTA_2\",\n  \"text\": \"Hello\",\n  \"visible\": \"true\",\n  \"bounds\": \"{0, 0, 100, 20}\"\n}"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce find node by attr",
+    "tool": "roku_find_node",
+    "args": {
+      "rceDevice": "400",
+      "attr": "text",
+      "value": "Play"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"name\": \"play\",\n  \"uiElementId\": \"RTA_4\",\n  \"text\": \"Play\",\n  \"focused\": \"true\"\n}"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce find node by prefixed attr, many",
+    "tool": "roku_find_node",
+    "args": {
+      "rceDevice": "400",
+      "attr": "@_name",
+      "value": "MainScene"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"name\": \"MainScene\",\n  \"uiElementId\": \"RTA_1\",\n  \"focused\": \"true\"\n}"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce find node by subtype attr, many",
+    "tool": "roku_find_node",
+    "args": {
+      "rceDevice": "400",
+      "attr": "focused",
+      "value": "true"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "[\n  {\n    \"focused\": \"true\",\n    \"type\": \"RoScreen\"\n  },\n  {\n    \"name\": \"MainScene\",\n    \"uiElementId\": \"RTA_1\",\n    \"focused\": \"true\"\n  },\n  {\n    \"name\": \"play\",\n    \"uiElementId\": \"RTA_4\",\n    \"text\": \"Play\",\n    \"focused\": \"true\"\n  }\n]"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce find node none",
+    "tool": "roku_find_node",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "nothing"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "No node found with id or name \"nothing\" in the current UI tree."
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce find node none by attr",
+    "tool": "roku_find_node",
+    "args": {
+      "rceDevice": "400",
+      "attr": "text",
+      "value": "Nope"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "No node found with text=\"Nope\" in the current UI tree."
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce find node missing args",
+    "tool": "roku_find_node",
+    "args": {
+      "rceDevice": "400",
+      "attr": "text"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Provide either nodeId, or both attr and value to search for a node."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "rce find node 404",
+    "tool": "roku_find_node",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "menu"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Find node failed: No dev channel is running (the device answered 404 to query/app-ui). Deploy one with roku_deploy first."
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "ecp GET query/app-ui",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce focused node",
+    "tool": "roku_get_focused_node",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"focused\": \"true\",\n  \"type\": \"RoScreen\"\n}"
+        }
+      ]
+    },
+    "calls": [
+      "ecp GET query/app-ui",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "rce focused node 404",
+    "tool": "roku_get_focused_node",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Get focused node failed: No dev channel is running (the device answered 404 to query/app-ui). Deploy one with roku_deploy first."
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "ecp GET query/app-ui",
+      "rce ecp timeout 30000"
+    ]
+  },
+  {
+    "name": "sleep",
+    "tool": "roku_sleep",
+    "args": {
+      "durationMs": 5
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Waited 5ms"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "sleep negative",
+    "tool": "roku_sleep",
+    "args": {
+      "durationMs": -3
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Waited 0ms"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "unknown cloud device",
+    "tool": "roku_keypress",
+    "args": {
+      "rceDevice": "nope",
+      "key": "Home"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Key press failed: No Cloud Device matches \"nope\" (RCE: not_found)"
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "unresolvable host",
+    "tool": "roku_query_device_info",
+    "args": {
+      "host": "no-such-host.invalid"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Query device info failed: Could not resolve the Roku device hostname. Verify the host address is correct."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "ROKU_RCE_DEVICE env picks the Cloud Device",
+    "tool": "roku_keypress",
+    "args": {
+      "key": "Back"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Key press sent: Back"
+        }
+      ]
+    },
+    "calls": [
+      "rce keypress Back"
+    ]
+  },
+  {
+    "name": "host param beats ROKU_RCE_DEVICE",
+    "tool": "roku_keypress",
+    "args": {
+      "host": "127.0.0.1",
+      "key": "Back"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Key press sent: Back"
+        }
+      ]
+    },
+    "calls": [
+      "ecp POST keypress/Back"
+    ]
+  },
+  {
+    "name": "ROKU_IP alias",
+    "tool": "roku_keypress",
+    "args": {
+      "key": "Back"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Key press sent: Back"
+        }
+      ]
+    },
+    "calls": [
+      "ecp POST keypress/Back"
+    ]
+  },
+  {
+    "name": "deploy without manifest",
+    "tool": "roku_deploy",
+    "args": {
+      "rceDevice": "400",
+      "rootDir": "<work>/empty"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Deploy failed: No manifest file found at <work>/empty/manifest. The rootDir must point to the Roku project directory that contains the manifest file."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "deploy rce",
+    "tool": "roku_deploy",
+    "args": {
+      "rceDevice": "400",
+      "rootDir": "<repo>/sampleApp"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Successfully deployed app from <repo>/sampleApp to Cloud Device 400 (Parity_1)"
+        }
+      ]
+    },
+    "calls": [
+      "rce install roku-deploy.zip zip"
+    ]
+  },
+  {
+    "name": "deploy rce identical",
+    "tool": "roku_deploy",
+    "args": {
+      "rceDevice": "Parity_3",
+      "rootDir": "<repo>/sampleApp",
+      "files": [
+        "manifest",
+        "source/**/*"
+      ]
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Successfully deployed app from <repo>/sampleApp to Cloud Device 402 (Parity_3) (the device reported the package as identical to the installed one)"
+        }
+      ]
+    },
+    "calls": [
+      "rce install roku-deploy.zip zip"
+    ]
+  },
+  {
+    "name": "deploy staging overlaps rootDir",
+    "tool": "roku_deploy",
+    "args": {
+      "rceDevice": "400",
+      "rootDir": "<repo>/sampleApp",
+      "stagingDir": "<repo>/sampleApp/stage"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Deploy failed: stagingDir must not be rootDir, inside it, or contain it (roku-deploy empties and deletes it)."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "deploy staging contains rootDir",
+    "tool": "roku_deploy",
+    "args": {
+      "rceDevice": "400",
+      "rootDir": "<repo>/sampleApp",
+      "stagingDir": "<repo>"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Deploy failed: stagingDir must not be rootDir, inside it, or contain it (roku-deploy empties and deletes it)."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "deploy lan, installer closed",
+    "tool": "roku_deploy",
+    "args": {
+      "host": "127.0.0.1",
+      "rootDir": "<repo>/sampleApp",
+      "stagingDir": "<work>/stage"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Deploy failed: Connection refused at 127.0.0.1 (developer web installer, port 80) — the service is not listening. Verify the IP address is correct, the device is powered on, and the service is enabled."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "deploy lan without password",
+    "tool": "roku_deploy",
+    "args": {
+      "host": "127.0.0.1",
+      "rootDir": "<repo>/sampleApp"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Deploy failed: Roku developer password is required. Please provide the password as a parameter or set ROKU_DEVICE_PASSWORD (aliases: ROKU_DEV_PASSWORD, ROKU_PASSWORD) in your .env file."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "deploy rce without password",
+    "tool": "roku_deploy",
+    "args": {
+      "rceDevice": "400",
+      "rootDir": "<repo>/sampleApp"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Deploy failed: The Cloud Device developer password is required. Pass `password` or set ROKU_RCE_PASSWORD in your .env file."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "deploy rce password param",
+    "tool": "roku_deploy",
+    "args": {
+      "rceDevice": "400",
+      "rootDir": "<repo>/sampleApp",
+      "password": "param"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Successfully deployed app from <repo>/sampleApp to Cloud Device 400 (Parity_1)"
+        }
+      ]
+    },
+    "calls": [
+      "rce install roku-deploy.zip zip"
+    ]
+  },
+  {
+    "name": "delete rce",
+    "tool": "roku_delete_dev_channel",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Successfully deleted dev channel from Cloud Device 400 (Parity_1)"
+        }
+      ]
+    },
+    "calls": [
+      "rce delete"
+    ]
+  },
+  {
+    "name": "delete lan, installer closed",
+    "tool": "roku_delete_dev_channel",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Delete dev channel failed: Connection refused at 127.0.0.1 (developer web installer, port 80) — the service is not listening. Verify the IP address is correct, the device is powered on, and the service is enabled."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "delete lan without password",
+    "tool": "roku_delete_dev_channel",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Delete dev channel failed: Roku developer password is required. Please provide the password as a parameter or set ROKU_DEVICE_PASSWORD (aliases: ROKU_DEV_PASSWORD, ROKU_PASSWORD) in your .env file."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "screenshot rce to dir",
+    "tool": "roku_screenshot",
+    "args": {
+      "rceDevice": "400",
+      "outDir": "<work>/shots",
+      "outFile": "shot"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "image",
+          "data": "iVBORw0KGgo=",
+          "mimeType": "image/png"
+        },
+        {
+          "type": "text",
+          "text": "Screenshot saved to: <work>/shots/shot.png"
+        }
+      ]
+    },
+    "calls": [
+      "rce screenshot"
+    ],
+    "extra": "89504e470d0a1a0a"
+  },
+  {
+    "name": "screenshot rce default name",
+    "tool": "roku_screenshot",
+    "args": {
+      "rceDevice": "400",
+      "outDir": "<work>/shots"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "image",
+          "data": "iVBORw0KGgo=",
+          "mimeType": "image/png"
+        },
+        {
+          "type": "text",
+          "text": "Screenshot saved to: <work>/shots/screenshot-<ts>.png"
+        }
+      ]
+    },
+    "calls": [
+      "rce screenshot"
+    ]
+  },
+  {
+    "name": "screenshot lan, installer closed",
+    "tool": "roku_screenshot",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Screenshot failed: Connection refused at 127.0.0.1 (developer web installer, port 80) — the service is not listening. Verify the IP address is correct, the device is powered on, and the service is enabled."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "screenshot without password",
+    "tool": "roku_screenshot",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Screenshot failed: Roku developer password is required. Please provide the password as a parameter or set ROKU_DEVICE_PASSWORD (aliases: ROKU_DEV_PASSWORD, ROKU_PASSWORD) in your .env file."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "console read without connection",
+    "tool": "roku_console_read",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "No active console connection. Use roku_console_connect first."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "console send without connection",
+    "tool": "roku_console_send",
+    "args": {
+      "command": "bt"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "No active console connection. Use roku_console_connect first."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "console disconnect without connection",
+    "tool": "roku_console_disconnect",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "No active console connection to disconnect."
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "console connect lan",
+    "tool": "roku_console_connect",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Connected to BrightScript debug console at 127.0.0.1:8085. The next roku_console_read or roku_console_send closes this connection."
+        }
+      ]
+    },
+    "calls": [
+      "console lan connect"
+    ]
+  },
+  {
+    "name": "console connect again",
+    "tool": "roku_console_connect",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Already connected to 127.0.0.1. Disconnect first to connect to a different device."
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "console read lan",
+    "tool": "roku_console_read",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "old session line\n\n\n--- disconnected from 127.0.0.1 ---"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "console connect rce",
+    "tool": "roku_console_connect",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Connected to BrightScript debug console at Cloud Device 400 (Parity_1):8085. The next roku_console_read or roku_console_send closes this connection."
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 8085",
+      "console rce connect"
+    ]
+  },
+  {
+    "name": "console send bt",
+    "tool": "roku_console_send",
+    "args": {
+      "command": "bt"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Backtrace:\n#0  Function main() As Void\n\n\n--- disconnected from Cloud Device 400 (Parity_1) ---"
+        }
+      ]
+    },
+    "calls": [
+      "console rce recv \"bt\""
+    ]
+  },
+  {
+    "name": "console connect lan for disconnect",
+    "tool": "roku_console_connect",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Connected to BrightScript debug console at 127.0.0.1:8085. The next roku_console_read or roku_console_send closes this connection."
+        }
+      ]
+    },
+    "calls": [
+      "console lan connect"
+    ]
+  },
+  {
+    "name": "console disconnect",
+    "tool": "roku_console_disconnect",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Disconnected from 127.0.0.1"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "console connect refused port",
+    "tool": "roku_console_connect",
+    "args": {
+      "host": "127.0.0.1",
+      "port": 8099
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Console connect failed: Connection refused at 127.0.0.1 (port 8099) — the service is not listening. Verify the IP address is correct, the device is powered on, and the service is enabled."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "console connect rce closed bridge",
+    "tool": "roku_console_connect",
+    "args": {
+      "rceDevice": "400",
+      "port": 8087
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Console connect failed: nothing listens on device port 8087 (RCE: port_closed)"
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "rce bridge 400 8087"
+    ]
+  },
+  {
+    "name": "console connect, read nothing new",
+    "tool": "roku_console_connect",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Connected to BrightScript debug console at 127.0.0.1:8085. The next roku_console_read or roku_console_send closes this connection."
+        }
+      ]
+    },
+    "calls": [
+      "console lan connect"
+    ]
+  },
+  {
+    "name": "console read drains the replay",
+    "tool": "roku_console_read",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "old session line\n\n\n--- disconnected from 127.0.0.1 ---"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "capture status idle",
+    "tool": "roku_console_capture_status",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"active\":false}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "capture wait without capture",
+    "tool": "roku_console_wait",
+    "args": {
+      "pattern": "x"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "No active capture. Call roku_console_capture_start first."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "capture stop without capture",
+    "tool": "roku_console_capture_stop",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "No active capture."
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "capture start rce",
+    "tool": "roku_console_capture_start",
+    "args": {
+      "rceDevice": "400",
+      "file": "<work>/logs/cap.log",
+      "settleMs": 100
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Capturing Cloud Device 400 (Parity_1):8085 to <work>/logs/cap.log."
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 8085",
+      "console rce connect"
+    ]
+  },
+  {
+    "name": "console connect during capture",
+    "tool": "roku_console_connect",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "A console capture is active and holds port 8085 (single client). Use roku_console_wait, or read the capture file; stop it with roku_console_capture_stop to use the single-shot console tools again."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "console read during capture",
+    "tool": "roku_console_read",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "A console capture is active and holds port 8085 (single client). Use roku_console_wait, or read the capture file; stop it with roku_console_capture_stop to use the single-shot console tools again."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "capture start twice",
+    "tool": "roku_console_capture_start",
+    "args": {
+      "host": "127.0.0.1",
+      "file": "<work>/logs/cap.log",
+      "settleMs": 10
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Capture already active: {\"active\":true,\"file\":\"<work>/logs/cap.log\",\"host\":\"Cloud Device 400 (Parity_1)\",\"startedAt\":\"<iso>\",\"bytes\":0,\"lines\":0}"
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "capture wait matched",
+    "tool": "roku_console_wait",
+    "args": {
+      "pattern": "app started",
+      "timeoutMs": 1000
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"matched\":true,\"lineNumber\":1,\"timestamp\":\"12:00:01.000\",\"preview\":\"[12:00:01.000] app started\",\"file\":\"<work>/logs/cap.log\"}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "capture wait jwtValid",
+    "tool": "roku_console_wait",
+    "args": {
+      "pattern": "Authorization",
+      "predicate": "jwtValid",
+      "timeoutMs": 1000
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"matched\":true,\"lineNumber\":3,\"timestamp\":\"01-02 12:00:03.250\",\"preview\":\"01-02 12:00:03.250 GET /b Authorization: Bearer <redacted>\",\"file\":\"<work>/logs/cap.log\"}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "capture wait invalid pattern",
+    "tool": "roku_console_wait",
+    "args": {
+      "pattern": "("
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Invalid pattern: Invalid regular expression: /(/: Unterminated group"
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "capture wait timeout",
+    "tool": "roku_console_wait",
+    "args": {
+      "pattern": "never",
+      "timeoutMs": 50
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"matched\":false,\"reason\":\"timeout\",\"file\":\"<work>/logs/cap.log\"}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "capture wait new lines only",
+    "tool": "roku_console_wait",
+    "args": {
+      "pattern": "app started|late",
+      "sinceCaptureStart": false,
+      "timeoutMs": 2000
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"matched\":true,\"lineNumber\":5,\"preview\":\"late line\",\"file\":\"<work>/logs/cap.log\"}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "capture wait waiting_for_debugger",
+    "tool": "roku_console_wait",
+    "args": {
+      "pattern": "nomatch",
+      "timeoutMs": 2000
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"matched\":false,\"reason\":\"waiting_for_debugger\",\"lineNumber\":6,\"preview\":\"------ Waiting for debugger on 192.168.1.2:8081\",\"file\":\"<work>/logs/cap.log\"}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "capture status active",
+    "tool": "roku_console_capture_status",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"active\":true,\"file\":\"<work>/logs/cap.log\",\"host\":\"Cloud Device 400 (Parity_1)\",\"startedAt\":\"<iso>\",\"bytes\":285,\"lines\":6}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "capture stop",
+    "tool": "roku_console_capture_stop",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"active\":false,\"file\":\"<work>/logs/cap.log\",\"host\":\"Cloud Device 400 (Parity_1)\",\"startedAt\":\"<iso>\",\"bytes\":285,\"lines\":6}"
+        }
+      ]
+    },
+    "calls": [],
+    "extra": "[12:00:01.000] app started\r\n01-02 12:00:02.500 GET /a Authorization: Bearer eyJhbGciOiJub25lIn0.eyJleHAiOjEwMDB9.sig\n01-02 12:00:03.250 GET /b Authorization: Bearer eyJhbGciOiJub25lIn0.eyJleHAiOjQxMDI0NDQ4MDB9.sig\npartial tail\nlate line\n------ Waiting for debugger on 192.168.1.2:8081\n"
+  },
+  {
+    "name": "capture start lan append",
+    "tool": "roku_console_capture_start",
+    "args": {
+      "host": "127.0.0.1",
+      "file": "<work>/logs/cap.log",
+      "append": true,
+      "settleMs": 50
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Capturing 127.0.0.1:8085 to <work>/logs/cap.log."
+        }
+      ]
+    },
+    "calls": [
+      "console lan connect"
+    ]
+  },
+  {
+    "name": "capture stop lan",
+    "tool": "roku_console_capture_stop",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"active\":false,\"file\":\"<work>/logs/cap.log\",\"host\":\"127.0.0.1\",\"startedAt\":\"<iso>\",\"bytes\":9,\"lines\":1}"
+        }
+      ]
+    },
+    "calls": [],
+    "extra": "[12:00:01.000] app started\r\n01-02 12:00:02.500 GET /a Authorization: Bearer eyJhbGciOiJub25lIn0.eyJleHAiOjEwMDB9.sig\n01-02 12:00:03.250 GET /b Authorization: Bearer eyJhbGciOiJub25lIn0.eyJleHAiOjQxMDI0NDQ4MDB9.sig\npartial tail\nlate line\n------ Waiting for debugger on 192.168.1.2:8081\nappended\n"
+  },
+  {
+    "name": "capture start refused",
+    "tool": "roku_console_capture_start",
+    "args": {
+      "rceDevice": "400",
+      "file": "<work>/logs/cap.log",
+      "settleMs": 10
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Console capture failed: nothing listens on device port 8085 (RCE: port_closed)"
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "rce bridge 400 8085"
+    ]
+  },
+  {
+    "name": "capture status after refused start",
+    "tool": "roku_console_capture_status",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"active\":false}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "lan edit node by element id",
+    "tool": "roku_edit_node",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "RTA_2",
+      "fields": {
+        "text": "Hi",
+        "visible": false,
+        "translation": [
+          1,
+          2
+        ],
+        "opacity": 0.5
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Updated node \"RTA_2\":\ntext = \"Hi\" -> OK\nvisible = false -> OK\ntranslation = [1,2] -> OK\nopacity = 0.5 -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan setValue {\"base\":\"elementId\",\"keyPath\":\"RTA_2\",\"field\":\"text\",\"value\":\"Hi\"}",
+      "rta lan setValue {\"base\":\"elementId\",\"keyPath\":\"RTA_2\",\"field\":\"visible\",\"value\":false}",
+      "rta lan setValue {\"base\":\"elementId\",\"keyPath\":\"RTA_2\",\"field\":\"translation\",\"value\":[1,2]}",
+      "rta lan setValue {\"base\":\"elementId\",\"keyPath\":\"RTA_2\",\"field\":\"opacity\",\"value\":0.5}"
+    ]
+  },
+  {
+    "name": "lan edit node by scene id",
+    "tool": "roku_edit_node",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "title",
+      "fields": {
+        "text": "x"
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Updated node \"title\":\ntext = \"x\" -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan setValue {\"base\":\"scene\",\"keyPath\":\"title.text\",\"field\":\"text\",\"value\":\"x\"}"
+    ]
+  },
+  {
+    "name": "lan edit node rta error",
+    "tool": "roku_edit_node",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "missingNode",
+      "fields": {
+        "text": "x"
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Updated node \"missingNode\":\ntext = \"x\" -> RTA error: {\"message\":\"No node at missingNode.text\"}"
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan setValue {\"base\":\"scene\",\"keyPath\":\"missingNode.text\",\"field\":\"text\",\"value\":\"x\"}"
+    ]
+  },
+  {
+    "name": "lan edit node no fields",
+    "tool": "roku_edit_node",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "RTA_2",
+      "fields": {}
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "No fields provided."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "lan set visible",
+    "tool": "roku_set_node_visible",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "RTA_2",
+      "visible": false
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Hid \"RTA_2\" -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan setValue {\"base\":\"elementId\",\"keyPath\":\"RTA_2\",\"field\":\"visible\",\"value\":false}"
+    ]
+  },
+  {
+    "name": "lan set visible true",
+    "tool": "roku_set_node_visible",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "title",
+      "visible": true
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Showed \"title\" -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan setValue {\"base\":\"scene\",\"keyPath\":\"title.visible\",\"field\":\"visible\",\"value\":true}"
+    ]
+  },
+  {
+    "name": "lan move node",
+    "tool": "roku_move_node",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "RTA_3",
+      "x": 10,
+      "y": 20
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Moved \"RTA_3\" to [10, 20] -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan setValue {\"base\":\"elementId\",\"keyPath\":\"RTA_3\",\"field\":\"translation\",\"value\":[10,20]}"
+    ]
+  },
+  {
+    "name": "lan move node rta error",
+    "tool": "roku_move_node",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "missing",
+      "x": 1,
+      "y": 1
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Moved \"missing\" to [1, 1] -> RTA error: {\"message\":\"No node at missing.translation\"}"
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan setValue {\"base\":\"scene\",\"keyPath\":\"missing.translation\",\"field\":\"translation\",\"value\":[1,1]}"
+    ]
+  },
+  {
+    "name": "lan focus node",
+    "tool": "roku_focus_node",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "RTA_4"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Focus(true) \"RTA_4\" -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan focusNode {\"base\":\"elementId\",\"keyPath\":\"RTA_4\",\"on\":true}"
+    ]
+  },
+  {
+    "name": "lan unfocus node",
+    "tool": "roku_focus_node",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "menu",
+      "on": false
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Focus(false) \"menu\" -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan focusNode {\"base\":\"scene\",\"keyPath\":\"menu\",\"on\":false}"
+    ]
+  },
+  {
+    "name": "lan remove node",
+    "tool": "roku_remove_node",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "rta_5"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Removed \"rta_5\" -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan removeNode {\"base\":\"elementId\",\"keyPath\":\"rta_5\"}"
+    ]
+  },
+  {
+    "name": "lan create node",
+    "tool": "roku_create_node",
+    "args": {
+      "host": "127.0.0.1",
+      "parentId": "RTA_3",
+      "subtype": "Label",
+      "id": "newLabel",
+      "fields": {
+        "text": "n"
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Created <Label> id=\"newLabel\" under \"RTA_3\" -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan createChild {\"base\":\"elementId\",\"keyPath\":\"RTA_3\",\"subtype\":\"Label\",\"fields\":{\"text\":\"n\",\"id\":\"newLabel\"}}"
+    ]
+  },
+  {
+    "name": "lan create node bare",
+    "tool": "roku_create_node",
+    "args": {
+      "host": "127.0.0.1",
+      "parentId": "menu",
+      "subtype": "Rectangle"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Created <Rectangle> under \"menu\" -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan createChild {\"base\":\"scene\",\"keyPath\":\"menu\",\"subtype\":\"Rectangle\",\"fields\":{}}"
+    ]
+  },
+  {
+    "name": "lan get value element",
+    "tool": "roku_get_value",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "RTA_2",
+      "field": "text"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"found\": true,\n  \"value\": \"Hello\",\n  \"timeTaken\": 3\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan getValue {\"base\":\"elementId\",\"keyPath\":\"RTA_2\",\"field\":\"text\"}"
+    ]
+  },
+  {
+    "name": "lan get value scene",
+    "tool": "roku_get_value",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "title",
+      "field": "text"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"found\": true,\n  \"value\": \"Hello\",\n  \"timeTaken\": 3\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan getValue {\"base\":\"scene\",\"keyPath\":\"title.text\",\"field\":\"text\"}"
+    ]
+  },
+  {
+    "name": "lan get value keyPath",
+    "tool": "roku_get_value",
+    "args": {
+      "host": "127.0.0.1",
+      "keyPath": "MainScene.title.text"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"found\": true,\n  \"value\": \"Hello\",\n  \"timeTaken\": 3\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan getValue {\"base\":\"scene\",\"keyPath\":\"MainScene.title.text\"}"
+    ]
+  },
+  {
+    "name": "lan get value keyPath global",
+    "tool": "roku_get_value",
+    "args": {
+      "host": "127.0.0.1",
+      "keyPath": "appVersion",
+      "base": "global"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"found\": true,\n  \"value\": \"Hello\",\n  \"timeTaken\": 3\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan getValue {\"base\":\"global\",\"keyPath\":\"appVersion\"}"
+    ]
+  },
+  {
+    "name": "lan get value base override",
+    "tool": "roku_get_value",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "RTA_2",
+      "field": "text",
+      "base": "scene"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"found\": true,\n  \"value\": \"Hello\",\n  \"timeTaken\": 3\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan getValue {\"base\":\"scene\",\"keyPath\":\"RTA_2.text\",\"field\":\"text\"}"
+    ]
+  },
+  {
+    "name": "lan get value rta error",
+    "tool": "roku_get_value",
+    "args": {
+      "host": "127.0.0.1",
+      "keyPath": "missing.text"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"error\": {\n    \"message\": \"No node at missing.text\"\n  }\n}"
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan getValue {\"base\":\"scene\",\"keyPath\":\"missing.text\"}"
+    ]
+  },
+  {
+    "name": "lan get value missing args",
+    "tool": "roku_get_value",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "RTA_2"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Provide either `keyPath` or both `nodeId` and `field`."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "lan observe element",
+    "tool": "roku_observe_field",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "RTA_2",
+      "field": "text",
+      "match": "Hi",
+      "timeoutMs": 100
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"observerFired\": true,\n  \"value\": \"Hi\",\n  \"timeTaken\": 5\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan onFieldChangeOnce {\"base\":\"elementId\",\"keyPath\":\"RTA_2\",\"field\":\"text\",\"observerFireTimeout\":100,\"match\":\"Hi\"}"
+    ]
+  },
+  {
+    "name": "lan observe scene",
+    "tool": "roku_observe_field",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "title",
+      "field": "visible",
+      "timeoutMs": 100
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"observerFired\": true,\n  \"value\": \"changed\",\n  \"timeTaken\": 5\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan onFieldChangeOnce {\"base\":\"scene\",\"keyPath\":\"title.visible\",\"field\":\"visible\",\"observerFireTimeout\":100}"
+    ]
+  },
+  {
+    "name": "lan observe keyPath",
+    "tool": "roku_observe_field",
+    "args": {
+      "host": "127.0.0.1",
+      "keyPath": "MainScene.video.state",
+      "match": "playing"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"observerFired\": true,\n  \"value\": \"playing\",\n  \"timeTaken\": 5\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rta lan setSettings {\"logLevel\":\"info\"}",
+      "rta lan onFieldChangeOnce {\"base\":\"scene\",\"keyPath\":\"MainScene.video.state\",\"observerFireTimeout\":10000,\"match\":\"playing\"}"
+    ]
+  },
+  {
+    "name": "lan observe missing args",
+    "tool": "roku_observe_field",
+    "args": {
+      "host": "127.0.0.1",
+      "field": "text"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Provide either `keyPath` or both `nodeId` and `field`."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "lan rta not in channel",
+    "tool": "roku_edit_node",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "RTA_2",
+      "fields": {
+        "text": "x"
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Edit node failed: RTA socket closed before response was received\n\nThis tool talks to the roku-test-automation (RTA) On-Device Component on TCP port 9000. If the connection is refused, the channel does not include RTA. To enable it, either bundle the RTA OnDeviceComponent in your channel OR (when sideloading via roku-debug) set `\"injectRdbOnDeviceComponent\": true` in launch.json and add the marker comment `' vscode_rdb_on_device_component_entry` immediately after `screen.show()` inside `main()`. A successful install logs `[RTA][INFO] OnDeviceComponent init` at channel launch."
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "rta lan refused"
+    ]
+  },
+  {
+    "name": "rce edit node by element id",
+    "tool": "roku_edit_node",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "RTA_2",
+      "fields": {
+        "text": "Hi",
+        "visible": false,
+        "translation": [
+          1,
+          2
+        ],
+        "opacity": 0.5
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Updated node \"RTA_2\":\ntext = \"Hi\" -> OK\nvisible = false -> OK\ntranslation = [1,2] -> OK\nopacity = 0.5 -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce setValue {\"base\":\"elementId\",\"keyPath\":\"RTA_2\",\"field\":\"text\",\"value\":\"Hi\"}",
+      "rta rce setValue {\"base\":\"elementId\",\"keyPath\":\"RTA_2\",\"field\":\"visible\",\"value\":false}",
+      "rta rce setValue {\"base\":\"elementId\",\"keyPath\":\"RTA_2\",\"field\":\"translation\",\"value\":[1,2]}",
+      "rta rce setValue {\"base\":\"elementId\",\"keyPath\":\"RTA_2\",\"field\":\"opacity\",\"value\":0.5}"
+    ]
+  },
+  {
+    "name": "rce edit node by scene id",
+    "tool": "roku_edit_node",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "title",
+      "fields": {
+        "text": "x"
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Updated node \"title\":\ntext = \"x\" -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce setValue {\"base\":\"scene\",\"keyPath\":\"title.text\",\"field\":\"text\",\"value\":\"x\"}"
+    ]
+  },
+  {
+    "name": "rce edit node rta error",
+    "tool": "roku_edit_node",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "missingNode",
+      "fields": {
+        "text": "x"
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Updated node \"missingNode\":\ntext = \"x\" -> RTA error: {\"message\":\"No node at missingNode.text\"}"
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce setValue {\"base\":\"scene\",\"keyPath\":\"missingNode.text\",\"field\":\"text\",\"value\":\"x\"}"
+    ]
+  },
+  {
+    "name": "rce edit node no fields",
+    "tool": "roku_edit_node",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "RTA_2",
+      "fields": {}
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "No fields provided."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "rce set visible",
+    "tool": "roku_set_node_visible",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "RTA_2",
+      "visible": false
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Hid \"RTA_2\" -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce setValue {\"base\":\"elementId\",\"keyPath\":\"RTA_2\",\"field\":\"visible\",\"value\":false}"
+    ]
+  },
+  {
+    "name": "rce set visible true",
+    "tool": "roku_set_node_visible",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "title",
+      "visible": true
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Showed \"title\" -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce setValue {\"base\":\"scene\",\"keyPath\":\"title.visible\",\"field\":\"visible\",\"value\":true}"
+    ]
+  },
+  {
+    "name": "rce move node",
+    "tool": "roku_move_node",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "RTA_3",
+      "x": 10,
+      "y": 20
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Moved \"RTA_3\" to [10, 20] -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce setValue {\"base\":\"elementId\",\"keyPath\":\"RTA_3\",\"field\":\"translation\",\"value\":[10,20]}"
+    ]
+  },
+  {
+    "name": "rce move node rta error",
+    "tool": "roku_move_node",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "missing",
+      "x": 1,
+      "y": 1
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Moved \"missing\" to [1, 1] -> RTA error: {\"message\":\"No node at missing.translation\"}"
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce setValue {\"base\":\"scene\",\"keyPath\":\"missing.translation\",\"field\":\"translation\",\"value\":[1,1]}"
+    ]
+  },
+  {
+    "name": "rce focus node",
+    "tool": "roku_focus_node",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "RTA_4"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Focus(true) \"RTA_4\" -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce focusNode {\"base\":\"elementId\",\"keyPath\":\"RTA_4\",\"on\":true}"
+    ]
+  },
+  {
+    "name": "rce unfocus node",
+    "tool": "roku_focus_node",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "menu",
+      "on": false
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Focus(false) \"menu\" -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce focusNode {\"base\":\"scene\",\"keyPath\":\"menu\",\"on\":false}"
+    ]
+  },
+  {
+    "name": "rce remove node",
+    "tool": "roku_remove_node",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "rta_5"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Removed \"rta_5\" -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce removeNode {\"base\":\"elementId\",\"keyPath\":\"rta_5\"}"
+    ]
+  },
+  {
+    "name": "rce create node",
+    "tool": "roku_create_node",
+    "args": {
+      "rceDevice": "400",
+      "parentId": "RTA_3",
+      "subtype": "Label",
+      "id": "newLabel",
+      "fields": {
+        "text": "n"
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Created <Label> id=\"newLabel\" under \"RTA_3\" -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce createChild {\"base\":\"elementId\",\"keyPath\":\"RTA_3\",\"subtype\":\"Label\",\"fields\":{\"text\":\"n\",\"id\":\"newLabel\"}}"
+    ]
+  },
+  {
+    "name": "rce create node bare",
+    "tool": "roku_create_node",
+    "args": {
+      "rceDevice": "400",
+      "parentId": "menu",
+      "subtype": "Rectangle"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Created <Rectangle> under \"menu\" -> OK"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce createChild {\"base\":\"scene\",\"keyPath\":\"menu\",\"subtype\":\"Rectangle\",\"fields\":{}}"
+    ]
+  },
+  {
+    "name": "rce get value element",
+    "tool": "roku_get_value",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "RTA_2",
+      "field": "text"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"found\": true,\n  \"value\": \"Hello\",\n  \"timeTaken\": 3\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce getValue {\"base\":\"elementId\",\"keyPath\":\"RTA_2\",\"field\":\"text\"}"
+    ]
+  },
+  {
+    "name": "rce get value scene",
+    "tool": "roku_get_value",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "title",
+      "field": "text"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"found\": true,\n  \"value\": \"Hello\",\n  \"timeTaken\": 3\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce getValue {\"base\":\"scene\",\"keyPath\":\"title.text\",\"field\":\"text\"}"
+    ]
+  },
+  {
+    "name": "rce get value keyPath",
+    "tool": "roku_get_value",
+    "args": {
+      "rceDevice": "400",
+      "keyPath": "MainScene.title.text"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"found\": true,\n  \"value\": \"Hello\",\n  \"timeTaken\": 3\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce getValue {\"base\":\"scene\",\"keyPath\":\"MainScene.title.text\"}"
+    ]
+  },
+  {
+    "name": "rce get value keyPath global",
+    "tool": "roku_get_value",
+    "args": {
+      "rceDevice": "400",
+      "keyPath": "appVersion",
+      "base": "global"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"found\": true,\n  \"value\": \"Hello\",\n  \"timeTaken\": 3\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce getValue {\"base\":\"global\",\"keyPath\":\"appVersion\"}"
+    ]
+  },
+  {
+    "name": "rce get value base override",
+    "tool": "roku_get_value",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "RTA_2",
+      "field": "text",
+      "base": "scene"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"found\": true,\n  \"value\": \"Hello\",\n  \"timeTaken\": 3\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce getValue {\"base\":\"scene\",\"keyPath\":\"RTA_2.text\",\"field\":\"text\"}"
+    ]
+  },
+  {
+    "name": "rce get value rta error",
+    "tool": "roku_get_value",
+    "args": {
+      "rceDevice": "400",
+      "keyPath": "missing.text"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"error\": {\n    \"message\": \"No node at missing.text\"\n  }\n}"
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce getValue {\"base\":\"scene\",\"keyPath\":\"missing.text\"}"
+    ]
+  },
+  {
+    "name": "rce get value missing args",
+    "tool": "roku_get_value",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "RTA_2"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Provide either `keyPath` or both `nodeId` and `field`."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "rce observe element",
+    "tool": "roku_observe_field",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "RTA_2",
+      "field": "text",
+      "match": "Hi",
+      "timeoutMs": 100
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"observerFired\": true,\n  \"value\": \"Hi\",\n  \"timeTaken\": 5\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce onFieldChangeOnce {\"base\":\"elementId\",\"keyPath\":\"RTA_2\",\"field\":\"text\",\"observerFireTimeout\":100,\"match\":\"Hi\"}"
+    ]
+  },
+  {
+    "name": "rce observe scene",
+    "tool": "roku_observe_field",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "title",
+      "field": "visible",
+      "timeoutMs": 100
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"observerFired\": true,\n  \"value\": \"changed\",\n  \"timeTaken\": 5\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce onFieldChangeOnce {\"base\":\"scene\",\"keyPath\":\"title.visible\",\"field\":\"visible\",\"observerFireTimeout\":100}"
+    ]
+  },
+  {
+    "name": "rce observe keyPath",
+    "tool": "roku_observe_field",
+    "args": {
+      "rceDevice": "400",
+      "keyPath": "MainScene.video.state",
+      "match": "playing"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": \"<rta-id>\",\n  \"observerFired\": true,\n  \"value\": \"playing\",\n  \"timeTaken\": 5\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce onFieldChangeOnce {\"base\":\"scene\",\"keyPath\":\"MainScene.video.state\",\"observerFireTimeout\":10000,\"match\":\"playing\"}"
+    ]
+  },
+  {
+    "name": "rce observe missing args",
+    "tool": "roku_observe_field",
+    "args": {
+      "rceDevice": "400",
+      "field": "text"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Provide either `keyPath` or both `nodeId` and `field`."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "rce rta not in channel",
+    "tool": "roku_edit_node",
+    "args": {
+      "rceDevice": "400",
+      "nodeId": "RTA_2",
+      "fields": {
+        "text": "x"
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Edit node failed: RTA socket closed before response was received\n\nThis tool talks to the roku-test-automation (RTA) On-Device Component on TCP port 9000. If the connection is refused, the channel does not include RTA. To enable it, either bundle the RTA OnDeviceComponent in your channel OR (when sideloading via roku-debug) set `\"injectRdbOnDeviceComponent\": true` in launch.json and add the marker comment `' vscode_rdb_on_device_component_entry` immediately after `screen.show()` inside `main()`. A successful install logs `[RTA][INFO] OnDeviceComponent init` at channel launch."
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce refused"
+    ]
+  },
+  {
+    "name": "rta observe timeout",
+    "tool": "roku_observe_field",
+    "args": {
+      "rceDevice": "400",
+      "keyPath": "MainScene.x",
+      "timeoutMs": 100
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Observe field failed: Connection timed out — the Roku device did not respond. Check that it is on the same network and not blocked by a firewall.\n\nThis tool talks to the roku-test-automation (RTA) On-Device Component on TCP port 9000. If the connection is refused, the channel does not include RTA. To enable it, either bundle the RTA OnDeviceComponent in your channel OR (when sideloading via roku-debug) set `\"injectRdbOnDeviceComponent\": true` in launch.json and add the marker comment `' vscode_rdb_on_device_component_entry` immediately after `screen.show()` inside `main()`. A successful install logs `[RTA][INFO] OnDeviceComponent init` at channel launch."
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "rce bridge 400 9000",
+      "rta rce setSettings {\"logLevel\":\"info\"}",
+      "rta rce onFieldChangeOnce {\"base\":\"scene\",\"keyPath\":\"MainScene.x\",\"observerFireTimeout\":100}"
+    ]
+  },
+  {
+    "name": "rta rce port closed",
+    "tool": "roku_get_value",
+    "args": {
+      "rceDevice": "400",
+      "keyPath": "a.b"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Get value failed: Port 9000 did not answer through the Roku Cloud Emulator bridge (RCE answered with a closed-port status). Either the running channel does not include the RTA On-Device Component, or RCE does not bridge port 9000 (RCE documents bridges for 8080, 8081, 8082, 8085, 8087, 9999 and 49152-65535). This path is unverified on RCE."
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "rce bridge 400 9000"
+    ]
+  },
+  {
+    "name": "rta lan refused",
+    "tool": "roku_focus_node",
+    "args": {
+      "host": "127.0.0.1",
+      "nodeId": "RTA_1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Focus node failed: RTA socket closed before response was received\n\nThis tool talks to the roku-test-automation (RTA) On-Device Component on TCP port 9000. If the connection is refused, the channel does not include RTA. To enable it, either bundle the RTA OnDeviceComponent in your channel OR (when sideloading via roku-debug) set `\"injectRdbOnDeviceComponent\": true` in launch.json and add the marker comment `' vscode_rdb_on_device_component_entry` immediately after `screen.show()` inside `main()`. A successful install logs `[RTA][INFO] OnDeviceComponent init` at channel launch."
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "rta lan refused"
+    ]
+  },
+  {
+    "name": "perfetto stop without recording",
+    "tool": "roku_perfetto_stop",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "No active Perfetto recording. Use roku_perfetto_start first."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "perfetto enable lan",
+    "tool": "roku_perfetto_enable",
+    "args": {
+      "host": "127.0.0.1"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"enabledChannels\": [\n    \"dev\"\n  ],\n  \"timestamp\": 1,\n  \"timestampEnd\": 0,\n  \"status\": \"OK\"\n}"
+        }
+      ]
+    },
+    "calls": [
+      "ecp POST perfetto/enable/dev"
+    ]
+  },
+  {
+    "name": "perfetto enable lan 500",
+    "tool": "roku_perfetto_enable",
+    "args": {
+      "host": "127.0.0.1",
+      "channelId": "12345"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Enable failed: Request failed with status code 500"
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "ecp POST perfetto/enable/12345"
+    ]
+  },
+  {
+    "name": "perfetto enable rce",
+    "tool": "roku_perfetto_enable",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Enable failed: roku_perfetto_enable is not supported on Roku Cloud Emulator devices. roku-perfetto talks to port 8060 and a plain WebSocket on the device directly, which RCE does not expose. Use a LAN Roku device (pass host), or profile with a .bsprof capture (analyze_bsprof)."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "perfetto start rce",
+    "tool": "roku_perfetto_start",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Start failed: roku_perfetto_start is not supported on Roku Cloud Emulator devices. roku-perfetto talks to port 8060 and a plain WebSocket on the device directly, which RCE does not expose. Use a LAN Roku device (pass host), or profile with a .bsprof capture (analyze_bsprof)."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "perfetto enable via ROKU_RCE_DEVICE",
+    "tool": "roku_perfetto_enable",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Enable failed: roku_perfetto_enable is not supported on Roku Cloud Emulator devices. roku-perfetto talks to port 8060 and a plain WebSocket on the device directly, which RCE does not expose. Use a LAN Roku device (pass host), or profile with a .bsprof capture (analyze_bsprof)."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "perfetto stop after enable",
+    "tool": "roku_perfetto_stop",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "No active Perfetto recording. Use roku_perfetto_start first."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "bsprof memory",
+    "tool": "analyze_bsprof",
+    "args": {
+      "filePath": "<work>/tiny.bsprof",
+      "mode": "memory"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"header\": {\n    \"targetName\": \"TestApp (dev)\",\n    \"targetVersion\": \"9.9.9999\",\n    \"device\": \"Roku TestModel\",\n    \"firmware\": \"TST.000\",\n    \"duration\": 0,\n    \"fileSize\": 86,\n    \"formatVersion\": \"v3.0.0\",\n    \"features\": [\n      \"line-specific-data\",\n      \"memory-operations\"\n    ]\n  },\n  \"summary\": {\n    \"totalAllocBytes\": 0,\n    \"totalFreeBytes\": 0,\n    \"totalRetainedBytes\": 0,\n    \"totalAllocCount\": 0,\n    \"totalFreeCount\": 0,\n    \"parseStats\": {\n      \"entries\": 2,\n      \"errors\": 0,\n      \"strings\": 1,\n      \"modules\": 0,\n      \"pathElements\": 1\n    }\n  },\n  \"byModule\": [],\n  \"byFile\": [],\n  \"byFunction\": []\n}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "bsprof cpu",
+    "tool": "analyze_bsprof",
+    "args": {
+      "filePath": "<work>/tiny.bsprof",
+      "mode": "cpu"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"header\": {\n    \"targetName\": \"TestApp (dev)\",\n    \"targetVersion\": \"9.9.9999\",\n    \"device\": \"Roku TestModel\",\n    \"firmware\": \"TST.000\",\n    \"duration\": 0,\n    \"fileSize\": 86,\n    \"formatVersion\": \"v3.0.0\",\n    \"features\": [\n      \"line-specific-data\",\n      \"memory-operations\"\n    ]\n  },\n  \"summary\": {\n    \"totalCpuTime\": 0,\n    \"totalWallTime\": 0,\n    \"totalCallCount\": 0,\n    \"parseStats\": {\n      \"entries\": 2,\n      \"errors\": 0,\n      \"strings\": 1,\n      \"modules\": 0,\n      \"pathElements\": 1\n    }\n  },\n  \"byFunction\": []\n}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "bsprof full",
+    "tool": "analyze_bsprof",
+    "args": {
+      "filePath": "<work>/tiny.bsprof",
+      "mode": "full"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"header\": {\n    \"targetName\": \"TestApp (dev)\",\n    \"targetVersion\": \"9.9.9999\",\n    \"device\": \"Roku TestModel\",\n    \"firmware\": \"TST.000\",\n    \"duration\": 0,\n    \"fileSize\": 86,\n    \"formatVersion\": \"v3.0.0\",\n    \"features\": [\n      \"line-specific-data\",\n      \"memory-operations\"\n    ]\n  },\n  \"memory\": {\n    \"header\": {\n      \"targetName\": \"TestApp (dev)\",\n      \"targetVersion\": \"9.9.9999\",\n      \"device\": \"Roku TestModel\",\n      \"firmware\": \"TST.000\",\n      \"duration\": 0,\n      \"fileSize\": 86,\n      \"formatVersion\": \"v3.0.0\",\n      \"features\": [\n        \"line-specific-data\",\n        \"memory-operations\"\n      ]\n    },\n    \"summary\": {\n      \"totalAllocBytes\": 0,\n      \"totalFreeBytes\": 0,\n      \"totalRetainedBytes\": 0,\n      \"totalAllocCount\": 0,\n      \"totalFreeCount\": 0,\n      \"parseStats\": {\n        \"entries\": 2,\n        \"errors\": 0,\n        \"strings\": 1,\n        \"modules\": 0,\n        \"pathElements\": 1\n      }\n    },\n    \"byModule\": [],\n    \"byFile\": [],\n    \"byFunction\": []\n  },\n  \"cpu\": {\n    \"header\": {\n      \"targetName\": \"TestApp (dev)\",\n      \"targetVersion\": \"9.9.9999\",\n      \"device\": \"Roku TestModel\",\n      \"firmware\": \"TST.000\",\n      \"duration\": 0,\n      \"fileSize\": 86,\n      \"formatVersion\": \"v3.0.0\",\n      \"features\": [\n        \"line-specific-data\",\n        \"memory-operations\"\n      ]\n    },\n    \"summary\": {\n      \"totalCpuTime\": 0,\n      \"totalWallTime\": 0,\n      \"totalCallCount\": 0,\n      \"parseStats\": {\n        \"entries\": 2,\n        \"errors\": 0,\n        \"strings\": 1,\n        \"modules\": 0,\n        \"pathElements\": 1\n      }\n    },\n    \"byFunction\": []\n  }\n}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "bsprof summary",
+    "tool": "analyze_bsprof",
+    "args": {
+      "filePath": "<work>/tiny.bsprof",
+      "mode": "summary"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"header\": {\n    \"targetName\": \"TestApp (dev)\",\n    \"targetVersion\": \"9.9.9999\",\n    \"device\": \"Roku TestModel\",\n    \"firmware\": \"TST.000\",\n    \"duration\": 0,\n    \"fileSize\": 86,\n    \"formatVersion\": \"v3.0.0\",\n    \"features\": [\n      \"line-specific-data\",\n      \"memory-operations\"\n    ]\n  },\n  \"parseStats\": {\n    \"entries\": 2,\n    \"errors\": 0,\n    \"strings\": 1,\n    \"modules\": 0,\n    \"pathElements\": 1\n  },\n  \"topMemoryLeaks\": [],\n  \"topCpuConsumers\": [],\n  \"moduleOverview\": []\n}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "bsprof options",
+    "tool": "analyze_bsprof",
+    "args": {
+      "filePath": "<work>/tiny.bsprof",
+      "mode": "memory",
+      "top": 1,
+      "sortBy": "allocated",
+      "filterModule": "main",
+      "threshold": 5
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"header\": {\n    \"targetName\": \"TestApp (dev)\",\n    \"targetVersion\": \"9.9.9999\",\n    \"device\": \"Roku TestModel\",\n    \"firmware\": \"TST.000\",\n    \"duration\": 0,\n    \"fileSize\": 86,\n    \"formatVersion\": \"v3.0.0\",\n    \"features\": [\n      \"line-specific-data\",\n      \"memory-operations\"\n    ]\n  },\n  \"summary\": {\n    \"totalAllocBytes\": 0,\n    \"totalFreeBytes\": 0,\n    \"totalRetainedBytes\": 0,\n    \"totalAllocCount\": 0,\n    \"totalFreeCount\": 0,\n    \"parseStats\": {\n      \"entries\": 2,\n      \"errors\": 0,\n      \"strings\": 1,\n      \"modules\": 0,\n      \"pathElements\": 1\n    }\n  },\n  \"byModule\": [],\n  \"byFile\": [],\n  \"byFunction\": []\n}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "bsprof compare",
+    "tool": "compare_bsprof",
+    "args": {
+      "beforePath": "<work>/tiny.bsprof",
+      "afterPath": "<work>/tiny.bsprof",
+      "top": 5
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"before\": {\n    \"file\": \"<work>/tiny.bsprof\",\n    \"targetVersion\": \"9.9.9999\"\n  },\n  \"after\": {\n    \"file\": \"<work>/tiny.bsprof\",\n    \"targetVersion\": \"9.9.9999\"\n  },\n  \"memoryDelta\": {\n    \"totalRetainedBefore\": 0,\n    \"totalRetainedAfter\": 0,\n    \"totalRetainedDelta\": 0,\n    \"regressions\": [],\n    \"improvements\": [],\n    \"newLeaks\": [],\n    \"resolvedLeaks\": []\n  },\n  \"cpuDelta\": {\n    \"totalCpuBefore\": 0,\n    \"totalCpuAfter\": 0,\n    \"totalCpuDelta\": 0,\n    \"regressions\": [],\n    \"improvements\": []\n  }\n}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "bsprof info",
+    "tool": "bsprof_info",
+    "args": {
+      "filePath": "<work>/tiny.bsprof"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"targetName\": \"TestApp (dev)\",\n  \"targetVersion\": \"9.9.9999\",\n  \"device\": \"Roku TestModel\",\n  \"firmware\": \"TST.000\",\n  \"duration\": 0,\n  \"fileSize\": 86,\n  \"formatVersion\": \"v3.0.0\",\n  \"features\": [\n    \"line-specific-data\",\n    \"memory-operations\"\n  ]\n}"
+        },
+        {
+          "type": "text",
+          "text": "Note: duration is reported as 0 here — bsprof_info reads only the header for speed. Run analyze_bsprof for the full profile (and the duration, when the file has a footer timestamp)."
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "bsprof missing file",
+    "tool": "analyze_bsprof",
+    "args": {
+      "filePath": "<work>/none.bsprof",
+      "mode": "cpu"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Analysis failed: ENOENT: no such file or directory, stat '<work>/none.bsprof'"
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "bsprof compare missing file",
+    "tool": "compare_bsprof",
+    "args": {
+      "beforePath": "<work>/tiny.bsprof",
+      "afterPath": "<work>/none.bsprof"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Comparison failed: ENOENT: no such file or directory, stat '<work>/none.bsprof'"
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "bsprof info missing file",
+    "tool": "bsprof_info",
+    "args": {
+      "filePath": "<work>/none.bsprof"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Info failed: ENOENT: no such file or directory, stat '<work>/none.bsprof'"
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "diagnose without evidence",
+    "tool": "roku_diagnose_stream",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Provide at least one evidence source: `errorInfo`, a manifest (`url` or `content`), a `charlesSessionPath`, or `captureLive: true`."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "diagnose drm error",
+    "tool": "roku_diagnose_stream",
+    "args": {
+      "errorInfo": "{\"errorCode\":-6,\"errorInfo\":{\"category\":\"drm\",\"drmerrcode\":13,\"dbgmsg\":\"license\"}}"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"verdict\": \"Roku reported a DRM error. The license/key handshake did not complete successfully.\",\n  \"findings\": [\n    {\n      \"id\": \"drm-error\",\n      \"severity\": \"blocking\",\n      \"cause\": \"Roku reported a DRM error. The license/key handshake did not complete successfully.\",\n      \"evidence\": [\n        \"Video.errorCode = -6 (DRM error)\",\n        \"drmerrcode = 13\",\n        \"dbgmsg: license\"\n      ],\n      \"confidence\": \"medium\",\n      \"fix\": \"Verify drmParams (KeySystem, licenseServerURL, licenseReqHeaders) match what the stream expects. Confirm the device supports the keysystem and that the license server accepts Roku's request. A 'BS lib provider not found' error means the DRM library is not installed. Installing a production app that uses that DRM loads the missing library (e.g. install YouTube to load Widevine, Netflix to load PlayReady).\",\n      \"docUrl\": \"https://developer.roku.com/dev/docs/content-protection\"\n    }\n  ],\n  \"deviceError\": {\n    \"errorCode\": -6,\n    \"errorCodeMeaning\": \"DRM error\",\n    \"category\": \"drm\",\n    \"dbgmsg\": \"license\",\n    \"drmerrcode\": 13,\n    \"empty\": false\n  },\n  \"notes\": [],\n  \"specVersion\": \"2026-06-05\",\n  \"specDisclaimer\": \"Roku stream support varies by OS version, model, and chipset. These tables are conservative, doc-sourced hints, not absolute guarantees. The authoritative answer for any given device is the Video node's own errorInfo after a real playback attempt.\"\n}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "diagnose pasted log text",
+    "tool": "roku_diagnose_stream",
+    "args": {
+      "errorInfo": "errorCode: -3 errorMsg: \"unknown codec\""
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"verdict\": \"Roku reported an error, but not enough evidence to pinpoint a root cause. Add the manifest and/or a Charles session for a sharper diagnosis.\",\n  \"findings\": [],\n  \"deviceError\": {\n    \"errorMsg\": \"unknown codec\",\n    \"empty\": false\n  },\n  \"notes\": [],\n  \"specVersion\": \"2026-06-05\",\n  \"specDisclaimer\": \"Roku stream support varies by OS version, model, and chipset. These tables are conservative, doc-sourced hints, not absolute guarantees. The authoritative answer for any given device is the Video node's own errorInfo after a real playback attempt.\"\n}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "diagnose error and manifest",
+    "tool": "roku_diagnose_stream",
+    "args": {
+      "errorInfo": "{\"errorCode\":-5}",
+      "content": "#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"aud\",NAME=\"English\",DEFAULT=YES,AUTOSELECT=YES,URI=\"a0/stream.m3u8\"\n#EXT-X-STREAM-INF:BANDWIDTH=1500000,RESOLUTION=1280x720,CODECS=\"avc1.64001f,mp4a.40.2\",AUDIO=\"aud\"\nv0/stream.m3u8\n",
+      "format": "hls",
+      "drm": {
+        "keySystem": "Widevine"
+      }
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"verdict\": \"Roku reported a media error (format unknown or unsupported), but the manifest codecs look supported. The problem is likely in the actual media (container/fragmentation, profile/level, or an encrypted track without DRM signaling).\",\n  \"findings\": [\n    {\n      \"id\": \"media-error-generic\",\n      \"severity\": \"blocking\",\n      \"cause\": \"Roku reported a media error (format unknown or unsupported), but the manifest codecs look supported. The problem is likely in the actual media (container/fragmentation, profile/level, or an encrypted track without DRM signaling).\",\n      \"evidence\": [\n        \"Video.errorCode = -5 (media error)\"\n      ],\n      \"confidence\": \"medium\",\n      \"fix\": \"Check the codec profile/level (e.g. very high H.264/HEVC levels), container fragmentation, and that any encrypted track is correctly DRM-signaled. Capture a Charles session to inspect the actual segment responses.\",\n      \"docUrl\": \"https://developer.roku.com/dev/docs/media\"\n    }\n  ],\n  \"deviceError\": {\n    \"errorCode\": -5,\n    \"errorCodeMeaning\": \"media error — the media format is unknown or unsupported\",\n    \"empty\": false\n  },\n  \"manifestSummary\": {\n    \"format\": \"hls\",\n    \"isLive\": false,\n    \"container\": \"ts\",\n    \"muxed\": false,\n    \"videoCodecs\": [\n      \"AVC\"\n    ],\n    \"audioCodecs\": [\n      \"AAC\"\n    ],\n    \"drm\": [],\n    \"isMultivariant\": true,\n    \"notes\": [\n      \"Master/multivariant playlist parsed. Per-variant media playlists (segment list) were not fetched; segment-level details are limited.\"\n    ]\n  },\n  \"notes\": [],\n  \"specVersion\": \"2026-06-05\",\n  \"specDisclaimer\": \"Roku stream support varies by OS version, model, and chipset. These tables are conservative, doc-sourced hints, not absolute guarantees. The authoritative answer for any given device is the Video node's own errorInfo after a real playback attempt.\"\n}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "diagnose missing charles file",
+    "tool": "roku_diagnose_stream",
+    "args": {
+      "charlesSessionPath": "<work>/none.chlsj"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"verdict\": \"No issues detected from the provided evidence. If playback still fails, capture the Video node errorInfo and/or a Charles session and re-run.\",\n  \"findings\": [],\n  \"notes\": [\n    \"Charles session could not be read/parsed: ENOENT: no such file or directory, open '<work>/none.chlsj'\"\n  ],\n  \"specVersion\": \"2026-06-05\",\n  \"specDisclaimer\": \"Roku stream support varies by OS version, model, and chipset. These tables are conservative, doc-sourced hints, not absolute guarantees. The authoritative answer for any given device is the Video node's own errorInfo after a real playback attempt.\"\n}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "diagnose bad manifest",
+    "tool": "roku_diagnose_stream",
+    "args": {
+      "content": "not a manifest"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"verdict\": \"No issues detected from the provided evidence. If playback still fails, capture the Video node errorInfo and/or a Charles session and re-run.\",\n  \"findings\": [],\n  \"manifestSummary\": {\n    \"format\": \"hls\",\n    \"isLive\": true,\n    \"container\": \"ts\",\n    \"muxed\": false,\n    \"videoCodecs\": [],\n    \"audioCodecs\": [],\n    \"drm\": [],\n    \"isMultivariant\": false,\n    \"notes\": []\n  },\n  \"notes\": [],\n  \"specVersion\": \"2026-06-05\",\n  \"specDisclaimer\": \"Roku stream support varies by OS version, model, and chipset. These tables are conservative, doc-sourced hints, not absolute guarantees. The authoritative answer for any given device is the Video node's own errorInfo after a real playback attempt.\"\n}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "diagnose captureLive rce",
+    "tool": "roku_diagnose_stream",
+    "args": {
+      "rceDevice": "400",
+      "captureLive": true
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "roku_diagnose_stream captureLive is not supported on Roku Cloud Emulator devices. Pass host for a LAN device, or play the stream in your own channel on the Cloud Device and pass the reported error as errorInfo."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "diagnose captureLive without url",
+    "tool": "roku_diagnose_stream",
+    "args": {
+      "host": "127.0.0.1",
+      "captureLive": true
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"verdict\": \"No issues detected from the provided evidence. If playback still fails, capture the Video node errorInfo and/or a Charles session and re-run.\",\n  \"findings\": [],\n  \"notes\": [\n    \"captureLive was requested but no `url` was provided — a live playback test needs a fetchable stream URL. Skipped live capture.\"\n  ],\n  \"specVersion\": \"2026-06-05\",\n  \"specDisclaimer\": \"Roku stream support varies by OS version, model, and chipset. These tables are conservative, doc-sourced hints, not absolute guarantees. The authoritative answer for any given device is the Video node's own errorInfo after a real playback attempt.\"\n}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "diagnose captureLive ignored with errorInfo",
+    "tool": "roku_diagnose_stream",
+    "args": {
+      "rceDevice": "400",
+      "captureLive": true,
+      "errorInfo": "{\"errorCode\":-1}"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"verdict\": \"Roku hit a network error reaching the stream (server unreachable, DNS, TLS, or a client network problem).\",\n  \"findings\": [\n    {\n      \"id\": \"network-error\",\n      \"severity\": \"blocking\",\n      \"cause\": \"Roku hit a network error reaching the stream (server unreachable, DNS, TLS, or a client network problem).\",\n      \"evidence\": [\n        \"Video.errorCode = -1 (network error (server down/unreachable, or a client network setup problem))\"\n      ],\n      \"confidence\": \"medium\",\n      \"fix\": \"Confirm the host resolves and responds from the device's network, the TLS certificate chain is complete and trusted, and the server isn't blocking Roku by User-Agent/IP. A Charles capture pinpoints which request failed.\",\n      \"docUrl\": \"https://developer.roku.com/dev/docs/video\"\n    }\n  ],\n  \"deviceError\": {\n    \"errorCode\": -1,\n    \"errorCodeMeaning\": \"network error (server down/unreachable, or a client network setup problem)\",\n    \"empty\": false\n  },\n  \"notes\": [],\n  \"specVersion\": \"2026-06-05\",\n  \"specDisclaimer\": \"Roku stream support varies by OS version, model, and chipset. These tables are conservative, doc-sourced hints, not absolute guarantees. The authoritative answer for any given device is the Video node's own errorInfo after a real playback attempt.\"\n}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "rce list devices",
+    "tool": "roku_rce_list_devices",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "[\n  {\n    \"id\": 400,\n    \"name\": \"Parity_1\",\n    \"deviceType\": \"stb\",\n    \"status\": \"running\",\n    \"firmware\": \"15.1.4\",\n    \"lastSnapshot\": {\n      \"id\": 1126,\n      \"name\": \"dev-mode\"\n    },\n    \"run\": {\n      \"runId\": 9001,\n      \"status\": \"running\",\n      \"snapshotId\": 1126,\n      \"snapshotName\": \"dev-mode\",\n      \"createdAt\": \"<iso>\",\n      \"startedByThisServer\": false,\n      \"elapsedSeconds\": <n>,\n      \"billedMinutes\": <n>,\n      \"costUsd\": <n>,\n      \"hourlyUsd\": 0.2,\n      \"autoStopAt\": \"<iso>\"\n    }\n  },\n  {\n    \"id\": 401,\n    \"name\": \"Parity_2\",\n    \"deviceType\": \"tv\",\n    \"status\": \"shutdown\",\n    \"firmware\": \"fw-1\",\n    \"lastSnapshot\": {\n      \"id\": 1128,\n      \"name\": null\n    },\n    \"run\": null\n  },\n  {\n    \"id\": 402,\n    \"name\": \"Parity_3\",\n    \"deviceType\": \"stb\",\n    \"status\": \"shutdown\",\n    \"firmware\": null,\n    \"lastSnapshot\": null,\n    \"run\": null\n  }\n]"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "rce status running",
+    "tool": "roku_rce_status",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": 400,\n  \"name\": \"Parity_1\",\n  \"deviceType\": \"stb\",\n  \"status\": \"running\",\n  \"firmware\": \"15.1.4\",\n  \"lastSnapshot\": {\n    \"id\": 1126,\n    \"name\": \"dev-mode\"\n  },\n  \"run\": {\n    \"runId\": 9001,\n    \"status\": \"running\",\n    \"snapshotId\": 1126,\n    \"snapshotName\": \"dev-mode\",\n    \"createdAt\": \"<iso>\",\n    \"startedByThisServer\": false,\n    \"elapsedSeconds\": <n>,\n    \"billedMinutes\": <n>,\n    \"costUsd\": <n>,\n    \"hourlyUsd\": 0.2,\n    \"autoStopAt\": \"<iso>\"\n  },\n  \"snapshots\": [\n    {\n      \"id\": 1126,\n      \"name\": \"dev-mode\",\n      \"createdAt\": \"<iso>\",\n      \"ready\": true,\n      \"live\": true,\n      \"base\": false\n    },\n    {\n      \"id\": 1,\n      \"name\": \"base\",\n      \"createdAt\": \"<iso>\",\n      \"ready\": true,\n      \"live\": false,\n      \"base\": true\n    }\n  ]\n}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "rce status by name",
+    "tool": "roku_rce_status",
+    "args": {
+      "rceDevice": "Parity_2"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": 401,\n  \"name\": \"Parity_2\",\n  \"deviceType\": \"tv\",\n  \"status\": \"shutdown\",\n  \"firmware\": \"fw-1\",\n  \"lastSnapshot\": {\n    \"id\": 1128,\n    \"name\": null\n  },\n  \"run\": null,\n  \"snapshots\": [\n    {\n      \"id\": 1126,\n      \"name\": \"dev-mode\",\n      \"createdAt\": \"<iso>\",\n      \"ready\": true,\n      \"live\": false,\n      \"base\": false\n    },\n    {\n      \"id\": 1,\n      \"name\": \"base\",\n      \"createdAt\": \"<iso>\",\n      \"ready\": true,\n      \"live\": false,\n      \"base\": true\n    }\n  ]\n}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "rce status from env",
+    "tool": "roku_rce_status",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"id\": 402,\n  \"name\": \"Parity_3\",\n  \"deviceType\": \"stb\",\n  \"status\": \"shutdown\",\n  \"firmware\": null,\n  \"lastSnapshot\": null,\n  \"run\": null,\n  \"snapshots\": [\n    {\n      \"id\": 1126,\n      \"name\": \"dev-mode\",\n      \"createdAt\": \"<iso>\",\n      \"ready\": true,\n      \"live\": false,\n      \"base\": false\n    },\n    {\n      \"id\": 1,\n      \"name\": \"base\",\n      \"createdAt\": \"<iso>\",\n      \"ready\": true,\n      \"live\": false,\n      \"base\": true\n    }\n  ]\n}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "rce status without device",
+    "tool": "roku_rce_status",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Cloud Device status failed: No Cloud Device given. Pass rceDevice (an id or exact name from roku_rce_list_devices) or set ROKU_RCE_DEVICE."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "rce status unknown",
+    "tool": "roku_rce_status",
+    "args": {
+      "rceDevice": "nope"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Cloud Device status failed: No Cloud Device matches \"nope\" (RCE: not_found)"
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "rce start refuses a running device",
+    "tool": "roku_rce_start",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Cloud Device 400 (Parity_1) already has a Run (status running). Nothing was started. Inspect it with roku_rce_status, or end it with roku_rce_stop."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "rce start",
+    "tool": "roku_rce_start",
+    "args": {
+      "rceDevice": "401"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"started\": true,\n  \"device\": {\n    \"id\": 401,\n    \"name\": \"Parity_2\",\n    \"deviceType\": \"tv\",\n    \"status\": \"running\",\n    \"firmware\": \"fw-1\",\n    \"lastSnapshot\": {\n      \"id\": 1128,\n      \"name\": null\n    },\n    \"run\": {\n      \"runId\": 9501,\n      \"status\": \"running\",\n      \"snapshotId\": 1126,\n      \"snapshotName\": \"dev-mode\",\n      \"createdAt\": \"<iso>\",\n      \"startedByThisServer\": true,\n      \"elapsedSeconds\": <n>,\n      \"billedMinutes\": <n>,\n      \"costUsd\": <n>,\n      \"hourlyUsd\": 0.2,\n      \"autoStopAt\": \"<iso>\"\n    }\n  },\n  \"billing\": \"Billing: a Roku Cloud Emulator Run costs $0.20 per hour, billed per minute from the start request. RCE never stops an idle Run (only the max runtime cap ends it), so always call roku_rce_stop when you are done.\"\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rce start 401 {\"maxRuntime\":3600}"
+    ]
+  },
+  {
+    "name": "rce start with options",
+    "tool": "roku_rce_start",
+    "args": {
+      "rceDevice": "401",
+      "snapshotId": 1126,
+      "maxRuntimeMinutes": 5
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"started\": true,\n  \"device\": {\n    \"id\": 401,\n    \"name\": \"Parity_2\",\n    \"deviceType\": \"tv\",\n    \"status\": \"running\",\n    \"firmware\": \"fw-1\",\n    \"lastSnapshot\": {\n      \"id\": 1128,\n      \"name\": null\n    },\n    \"run\": {\n      \"runId\": 9501,\n      \"status\": \"running\",\n      \"snapshotId\": 1126,\n      \"snapshotName\": \"dev-mode\",\n      \"createdAt\": \"<iso>\",\n      \"startedByThisServer\": true,\n      \"elapsedSeconds\": <n>,\n      \"billedMinutes\": <n>,\n      \"costUsd\": <n>,\n      \"hourlyUsd\": 0.2,\n      \"autoStopAt\": \"<iso>\"\n    }\n  },\n  \"billing\": \"Billing: a Roku Cloud Emulator Run costs $0.20 per hour, billed per minute from the start request. RCE never stops an idle Run (only the max runtime cap ends it), so always call roku_rce_stop when you are done.\"\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rce start 401 {\"snapshotId\":1126,\"maxRuntime\":300}"
+    ]
+  },
+  {
+    "name": "rce start not ready",
+    "tool": "roku_rce_start",
+    "args": {
+      "rceDevice": "402"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "The Run on Cloud Device 402 was started and is billing, but it did not become ready: Run did not take input within 240 s (RCE: timeout). Check it with roku_rce_status, and end it with roku_rce_stop if you do not need it."
+        }
+      ],
+      "isError": true
+    },
+    "calls": [
+      "rce start 402 {\"maxRuntime\":3600}"
+    ]
+  },
+  {
+    "name": "rce start without device",
+    "tool": "roku_rce_start",
+    "args": {},
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Start Run failed: No Cloud Device given. Pass rceDevice (an id or exact name from roku_rce_list_devices) or set ROKU_RCE_DEVICE."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "rce start max runtime too high",
+    "tool": "roku_rce_start",
+    "args": {
+      "rceDevice": "401",
+      "maxRuntimeMinutes": 500
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "MCP error -32602: Input validation error: Invalid arguments for tool roku_rce_start: Too big: expected number to be <=240 at maxRuntimeMinutes"
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  },
+  {
+    "name": "rce stop",
+    "tool": "roku_rce_stop",
+    "args": {
+      "rceDevice": "400"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"stopped\": true,\n  \"runId\": 9001,\n  \"startedByThisServer\": false,\n  \"billedMinutesAtStop\": <n>,\n  \"costUsdAtStop\": <n>,\n  \"device\": {\n    \"id\": 400,\n    \"name\": \"Parity_1\",\n    \"deviceType\": \"stb\",\n    \"status\": \"shutdown\",\n    \"firmware\": \"15.1.4\",\n    \"lastSnapshot\": {\n      \"id\": 1126,\n      \"name\": \"dev-mode\"\n    },\n    \"run\": null\n  }\n}"
+        }
+      ]
+    },
+    "calls": [
+      "rce stop 400 {\"runId\":9001}"
+    ]
+  },
+  {
+    "name": "rce stop without run",
+    "tool": "roku_rce_stop",
+    "args": {
+      "rceDevice": "401"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"stopped\": false,\n  \"message\": \"Cloud Device 401 (Parity_2) has no Run.\",\n  \"device\": {\n    \"id\": 401,\n    \"name\": \"Parity_2\",\n    \"deviceType\": \"tv\",\n    \"status\": \"shutdown\",\n    \"firmware\": \"fw-1\",\n    \"lastSnapshot\": {\n      \"id\": 1128,\n      \"name\": null\n    },\n    \"run\": null\n  }\n}"
+        }
+      ]
+    },
+    "calls": []
+  },
+  {
+    "name": "rce stop unknown",
+    "tool": "roku_rce_stop",
+    "args": {
+      "rceDevice": "nope"
+    },
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Stop Run failed: No Cloud Device matches \"nope\" (RCE: not_found). Check the device with roku_rce_status: a Run that is still up keeps billing."
+        }
+      ],
+      "isError": true
+    },
+    "calls": []
+  }
+]
