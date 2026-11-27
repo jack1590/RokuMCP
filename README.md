@@ -252,6 +252,7 @@ The script runs in a separate Node.js process started with the [permission model
   - **Calls in progress:** a device call already in progress when the run times out still finishes.
   - **Device hosts:** as with the tools, a deploy to a host the script names uses the configured password.
   - **Windows:** not tested yet.
+  - **Large profiles:** parsing a multi-hundred-MB `.bsprof` is synchronous and blocks the server until it finishes; the `roku_run` timeout cannot interrupt it. A script's `filterFile` takes simple globs only (no braces or extglobs).
   - **Full-mode console patterns:** `roku_console_wait` in full mode uses the normal regex engine, as in 1.9.0, so a catastrophic pattern can stall the server.
 
 ## Command line (rokuctl)

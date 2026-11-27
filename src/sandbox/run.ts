@@ -134,6 +134,10 @@ class Dispatcher {
     const input = valid.data as Record<string, unknown>;
     this.defaults(command, input);
     this.checkPaths(input);
+    // bsprof-cli rebuilds this glob with minimatch for every record: no brace or extglob expansion.
+    if (typeof input.filterFile === 'string' && /[{}()!@+]/.test(input.filterFile)) {
+      throw new RokuError('bad_args', 'filterFile from roku_run takes a simple glob (*, ?, [...]); braces and extglobs are refused.');
+    }
     // A snippet's regex runs on the server's event loop: linear time only (no ReDoS).
     if (command.name === 'console.wait' || command.name === 'console.capture') input.linear = true;
     return toPlain(await command.run(input)).data;

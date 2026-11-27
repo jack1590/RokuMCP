@@ -2,6 +2,7 @@ import axios from 'axios';
 import { RceError } from 'roku-rce';
 import { friendlyError } from '../roku-config.js';
 import { RokuError } from './errors.js';
+import { linearRegExp } from './linear-regexp.js';
 
 export interface ErrorInfo {
   /**
@@ -13,11 +14,14 @@ export interface ErrorInfo {
   message: string;
 }
 
+// Linear engine: the backtracking form was quadratic on long runs of "eyJ" in snippet-supplied text.
+const JWT = linearRegExp('eyJ[\\w-]+\\.[\\w-]+\\.[\\w-]*', 'g');
+
 const SECRET_VARS = ['ROKU_RCE_TOKEN', 'ROKU_RCE_PASSWORD', 'ROKU_DEVICE_PASSWORD', 'ROKU_DEV_PASSWORD', 'ROKU_PASSWORD'];
 
 /** Removes bearer tokens, JWTs and the values of the secret ROKU_* variables from text. */
 export function redactSecrets(text: string, env: NodeJS.ProcessEnv = process.env): string {
-  let out = text.replace(/(Bearer\s+)[\w.~+/=-]+/gi, '$1<redacted>').replace(/eyJ[\w-]+\.[\w-]+\.[\w-]*/g, '<jwt>');
+  let out = text.replace(/(Bearer\s+)[\w.~+/=-]+/gi, '$1<redacted>').replace(JWT, '<jwt>');
   for (const k of SECRET_VARS) {
     const v = env[k];
     // A word-character edge must not touch another word character, so a password like "roku" does

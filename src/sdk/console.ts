@@ -5,7 +5,7 @@
 import type { Duplex } from 'stream';
 import fs from 'fs';
 import path from 'path';
-import v8 from 'v8';
+import { linearRegExp } from './linear-regexp.js';
 import { friendlyError, resolveTarget, type TargetParams } from '../roku-config.js';
 import { RokuError } from './errors.js';
 
@@ -149,15 +149,6 @@ export interface CaptureSummary {
 
 let capture: CaptureSession | null = null;
 
-let linearEnabled = false;
-/** Turns on V8's linear-time RegExp engine (used only by regexes compiled with the 'l' flag). */
-function enableLinearRegExp(): void {
-  if (!linearEnabled) {
-    v8.setFlagsFromString('--enable-experimental-regexp-engine');
-    linearEnabled = true;
-  }
-}
-
 export function isCaptureActive(): boolean {
   return capture !== null;
 }
@@ -188,9 +179,12 @@ export function hasValidJwt(line: string, now = Date.now()): boolean {
   }
 }
 
+const JWT = linearRegExp('eyJ[\\w-]+\\.[\\w-]+\\.[\\w-]*', 'g');
+
 /** Short, token-free excerpt safe to return to the agent. */
 export function redactedPreview(line: string): string {
-  const redacted = line.replace(/(Bearer\s+)[\w.-]+/gi, '$1<redacted>').replace(/eyJ[\w-]+\.[\w-]+\.[\w-]*/g, '<jwt>');
+  // Linear engine: the backtracking form was quadratic on long runs of "eyJ".
+  const redacted = line.replace(/(Bearer\s+)[\w.-]+/gi, '$1<redacted>').replace(JWT, '<jwt>');
   return redacted.length > PREVIEW_CHARS ? redacted.slice(0, PREVIEW_CHARS) + '…' : redacted;
 }
 
@@ -319,8 +313,7 @@ export async function consoleWait(options: WaitOptions): Promise<WaitResult & { 
   if (!s) throw new RokuError('no_capture', 'No active capture. Call roku_console_capture_start first.', { bare: true });
   let regex: RegExp;
   try {
-    if (options.linear) enableLinearRegExp();
-    regex = new RegExp(options.pattern, options.linear ? 'l' : '');
+    regex = options.linear ? linearRegExp(options.pattern) : new RegExp(options.pattern);
   } catch (error) {
     const hint = options.linear ? ' (roku_run patterns run in linear time: no backreferences or lookarounds)' : '';
     throw new RokuError('bad_pattern', `Invalid pattern: ${friendlyError(error)}${hint}`, { bare: true });

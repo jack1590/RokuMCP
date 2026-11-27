@@ -130,7 +130,20 @@ export class PathPolicy {
   ensureOutputDir(): void {
     fs.mkdirSync(this.outputDir, { recursive: true });
     const ignore = path.join(this.outputDir, '.gitignore');
-    if (!fs.existsSync(ignore)) fs.writeFileSync(ignore, '# Written by roku_run (roku-mcp code mode)\n*\n');
+    // lstat: a dangling symlink planted here must not be written through.
+    if (fs.lstatSync(ignore, { throwIfNoEntry: false })) return;
+    let fd: number;
+    try {
+      fd = fs.openSync(ignore, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | (fs.constants.O_NOFOLLOW ?? 0));
+    } catch (error) {
+      if ((error as { code?: string }).code === 'EEXIST') return; // another call created it first
+      throw error;
+    }
+    try {
+      fs.writeSync(fd, '# Written by roku_run (roku-mcp code mode)\n*\n');
+    } finally {
+      fs.closeSync(fd);
+    }
   }
 
   /** Whether a directory entry may be listed. */

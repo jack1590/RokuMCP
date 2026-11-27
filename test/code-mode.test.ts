@@ -343,3 +343,42 @@ test('review fixes 3: linear-time patterns, no V8 flags, no tool config names, i
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('review fixes 4: linear redaction, simple filterFile globs, no heap snapshots, no write through a planted .gitignore link', { skip, timeout: 60_000 }, async () => {
+  const { describeError } = await import('../src/sdk/describe.js');
+  const { redactedPreview } = await import('../src/sdk/console.js');
+  let t = Date.now();
+  describeError(new Error('eyJ'.repeat(200_000)));
+  redactedPreview('eyJ'.repeat(200_000));
+  assert.ok(Date.now() - t < 3000, `redaction took ${Date.now() - t} ms`);
+  assert.equal(redactedPreview('token eyJa.b.c end'), 'token <jwt> end');
+
+  const root = workdir();
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'roku-out-'));
+  fs.writeFileSync(path.join(root, 'tiny.bsprof'), buildBsprof());
+  fs.mkdirSync(path.join(root, 'roku-run'));
+  fs.symlinkSync(path.join(outside, 'planted'), path.join(root, 'roku-run', '.gitignore'));
+  try {
+    t = Date.now();
+    const r = await run(
+      `
+      const t = async (f) => { try { return await f(); } catch (e) { return e.code; } };
+      return {
+        brace: await t(() => roku.profile.analyze({ filePath: 'tiny.bsprof', mode: 'cpu', filterFile: '{a,b}'.repeat(18) })),
+        simple: (await roku.profile.analyze({ filePath: 'tiny.bsprof', mode: 'cpu', filterFile: '*.brs' })) ? 'ok' : 'none',
+        snapshot: await t(() => process.getBuiltinModule('v8').setHeapSnapshotNearHeapLimit(1)),
+        write: (await roku.fs.write('a.json', '{}')).path,
+        bigName: await t(() => roku.ui['eyJ'.repeat(60000)]({})),
+      };
+    `,
+      { root }
+    );
+    assert.equal(r.ok, true, JSON.stringify(r.error));
+    assert.deepEqual(r.result, { brace: 'bad_args', simple: 'ok', snapshot: 'ERR_ACCESS_DENIED', write: path.join('roku-run', 'a.json'), bigName: 'unknown_call' });
+    assert.ok(Date.now() - t < 10_000);
+    assert.deepEqual(fs.readdirSync(outside), [], 'nothing written through the planted link');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
+});

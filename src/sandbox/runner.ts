@@ -45,9 +45,11 @@ function harden(): string | undefined {
   };
   // --allow-natives-syntax and other V8 flags would expose engine internals.
   const v8 = process.getBuiltinModule('node:v8') as Record<string, unknown>;
-  v8.setFlagsFromString = () => {
-    throw Object.assign(new Error('v8.setFlagsFromString is disabled in roku_run'), { code: 'ERR_ACCESS_DENIED' });
-  };
+  for (const fn of ['setFlagsFromString', 'setHeapSnapshotNearHeapLimit', 'writeHeapSnapshot']) {
+    v8[fn] = () => {
+      throw Object.assign(new Error(`v8.${fn} is disabled in roku_run`), { code: 'ERR_ACCESS_DENIED' });
+    };
+  }
   // Make `import { setPriority } from 'node:os'` see the stubs too.
   (process.getBuiltinModule('node:module') as { syncBuiltinESMExports(): void }).syncBuiltinESMExports();
   const left = ['kill', '_kill', '_debugProcess', '_debugEnd', 'abort'].filter((k) => typeof p[k] === 'function');
