@@ -365,7 +365,10 @@ test('review fixes 4: linear redaction, simple filterFile globs, no heap snapsho
       const t = async (f) => { try { return await f(); } catch (e) { return e.code; } };
       return {
         brace: await t(() => roku.profile.analyze({ filePath: 'tiny.bsprof', mode: 'cpu', filterFile: '{a,b}'.repeat(18) })),
-        simple: (await roku.profile.analyze({ filePath: 'tiny.bsprof', mode: 'cpu', filterFile: '*.brs' })) ? 'ok' : 'none',
+        simple: await t(() => roku.profile.analyze({ filePath: 'tiny.bsprof', mode: 'cpu', filterFile: '*.brs' })),
+        noFilter: (await roku.profile.analyze({ filePath: 'tiny.bsprof', mode: 'cpu', excludeModule: 'x' })) ? 'ok' : 'none',
+        bigArgs: await t(() => roku.input.keys({ keys: Array(600000).fill(1) })),
+        manyIssues: await t(() => roku.input.keys({ keys: Array(5000).fill(1) }).catch((e) => { throw Object.assign(new Error(), { code: e.message.length < 6000 ? 'short' : 'long' }); })),
         snapshot: await t(() => process.getBuiltinModule('v8').setHeapSnapshotNearHeapLimit(1)),
         write: (await roku.fs.write('a.json', '{}')).path,
         bigName: await t(() => roku.ui['eyJ'.repeat(60000)]({})),
@@ -374,11 +377,18 @@ test('review fixes 4: linear redaction, simple filterFile globs, no heap snapsho
       { root }
     );
     assert.equal(r.ok, true, JSON.stringify(r.error));
-    assert.deepEqual(r.result, { brace: 'bad_args', simple: 'ok', snapshot: 'ERR_ACCESS_DENIED', write: path.join('roku-run', 'a.json'), bigName: 'unknown_call' });
+    assert.deepEqual(r.result, { brace: 'bad_args', simple: 'bad_args', noFilter: 'ok', bigArgs: 'too_large', manyIssues: 'short', snapshot: 'ERR_ACCESS_DENIED', write: path.join('roku-run', 'a.json'), bigName: 'unknown_call' });
     assert.ok(Date.now() - t < 10_000);
     assert.deepEqual(fs.readdirSync(outside), [], 'nothing written through the planted link');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(outside, { recursive: true, force: true });
   }
+});
+
+test('the HLS attribute parser stays linear on long attribute names', async () => {
+  const { loadManifest } = await import('../src/stream/manifest.js');
+  const t = Date.now();
+  await loadManifest({ content: '#EXTM3U\n#EXT-X-STREAM-INF:' + 'A'.repeat(200_000) + '\nv.m3u8', format: 'hls' }).catch(() => undefined);
+  assert.ok(Date.now() - t < 3000, `took ${Date.now() - t} ms`);
 });

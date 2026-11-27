@@ -25,6 +25,7 @@ export const RUN_LIMITS = {
   maxReadBytes: 1024 * 1024,
   maxWriteBytes: 5 * 1024 * 1024,
   maxResultChars: 100 * 1024,
+  maxArgChars: 1024 * 1024,
 };
 
 /** Node's permission model without the experimental flag: 22.13+ (and 23.5+). */
@@ -120,6 +121,9 @@ class Dispatcher {
     if (Object.hasOwn(NOT_IN_CODE_MODE, name)) throw new RokuError('not_in_code_mode', NOT_IN_CODE_MODE[name]);
     const command = BY_CALL.get(name);
     if (!command) throw new RokuError('unknown_call', `roku.${name} does not exist. List the calls with roku_sdk_docs.`);
+    // A huge argument costs the server CPU in validation and error formatting before any check.
+    const argChars = JSON.stringify(args).length;
+    if (argChars > RUN_LIMITS.maxArgChars) throw new RokuError('too_large', `roku.${name} arguments are ${argChars} characters; the limit is ${RUN_LIMITS.maxArgChars}.`);
     const options = args[0] ?? {};
     if (!options || typeof options !== 'object' || Array.isArray(options)) {
       throw new RokuError('bad_args', `roku.${name} takes one options object, e.g. roku.${name}({ ... }).`);
@@ -128,15 +132,17 @@ class Dispatcher {
     const merged = 'host' in shape || 'rceDevice' in shape ? withDefaults(this.target, options as object) : options;
     const valid = parseCommandInput(command, merged);
     if (!valid.success) {
-      const issues = valid.error.issues.map((i) => `${i.path.join('.') || '(options)'}: ${i.message}`).join('; ');
+      const all = valid.error.issues;
+      const issues = all.slice(0, 20).map((i) => `${i.path.join('.').slice(0, 100) || '(options)'}: ${i.message.slice(0, 200)}`).join('; ') + (all.length > 20 ? `; and ${all.length - 20} more` : '');
       throw new RokuError('bad_args', `Invalid options for roku.${name}: ${issues}`);
     }
     const input = valid.data as Record<string, unknown>;
     this.defaults(command, input);
     this.checkPaths(input);
-    // bsprof-cli rebuilds this glob with minimatch for every record: no brace or extglob expansion.
-    if (typeof input.filterFile === 'string' && /[{}()!@+]/.test(input.filterFile)) {
-      throw new RokuError('bad_args', 'filterFile from roku_run takes a simple glob (*, ?, [...]); braces and extglobs are refused.');
+    // bsprof-cli matches this glob with minimatch for every record; even plain * globs backtrack
+    // exponentially on a long file name, on the server's event loop.
+    if (input.filterFile !== undefined) {
+      throw new RokuError('bad_args', 'filterFile cannot be set from roku_run; use filterModule or excludeModule, or filter the report in the script.');
     }
     // A snippet's regex runs on the server's event loop: linear time only (no ReDoS).
     if (command.name === 'console.wait' || command.name === 'console.capture') input.linear = true;

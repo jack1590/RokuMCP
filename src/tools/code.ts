@@ -63,7 +63,8 @@ export function registerCodeTools(server: McpServer): void {
     },
     async (params): Promise<ToolResult> => {
       const result = await runSnippet(params);
-      return { ...ok(JSON.stringify(result, null, 2)), ...(result.ok ? {} : { isError: true }) };
+      // Compact: pretty-printing deeply nested values grows with the square of the depth past the result cap.
+      return { ...ok(JSON.stringify(result)), ...(result.ok ? {} : { isError: true }) };
     }
   );
 

@@ -13,6 +13,7 @@
 
 import axios from 'axios';
 import { XMLParser } from 'fast-xml-parser';
+import { linearRegExp } from '../sdk/linear-regexp.js';
 
 const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
 
@@ -179,11 +180,15 @@ export function detectFormat(content: string | undefined, url: string | undefine
   return 'hls';
 }
 
+// Linear engine: the backtracking form retried at every position of a long name run (quadratic).
+const ATTR = linearRegExp('([A-Z0-9-]+)=("(?:[^"]*)"|[^,]*)', 'g');
+
 /** Parse a value like RESOLUTION=1920x1080 / BANDWIDTH=4500000 from an attr line. */
 function parseAttrList(line: string): Record<string, string> {
   const out: Record<string, string> = {};
   // Attribute lists are comma-separated, but quoted values may contain commas.
-  const re = /([A-Z0-9-]+)=("(?:[^"]*)"|[^,]*)/g;
+  const re = ATTR;
+  re.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(line)) !== null) {
     let val = m[2];

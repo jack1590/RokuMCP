@@ -244,7 +244,7 @@ The script runs in a separate Node.js process started with the [permission model
 - **Deploy:** `rootDir` must hold no secret file and no symlink. `files` and `stagingDir` cannot be set from a script.
 - **Perfetto SQL:** `roku.perfetto.query` is not available in a script, because `trace_processor` runs SQL with the server's rights (its SQLite can attach any database and overwrite files). Use `roku.perfetto.analyze`, or `query_perfetto` in full mode.
 - **Console patterns:** a script's `console.wait` and `console.capture` patterns run in V8's linear-time regex engine, so no backreferences or lookarounds; a pattern cannot stall the server.
-- **Limits:** 30 s by default (`timeoutMs`, at most 300 s), a 128 MB JavaScript heap, a 100 KiB return value, 64 KiB of logs, and 5,000 calls per run.
+- **Limits:** 30 s by default (`timeoutMs`, at most 300 s), a 128 MB JavaScript heap, a 100 KiB return value, 64 KiB of logs, 1 MiB of arguments per call, and 5,000 calls per run.
 - **Billing:** `roku.rce.start` in a script starts a billed Cloud Device Run ($0.20 per hour, never stopped when idle). A script stops it in `finally` only if the script ends normally: when `roku_run` kills it for a timeout, memory or a crash, the Run keeps billing. Check `roku_rce_status` and call `roku_rce_stop`. The server still stops the Runs it started when it shuts down.
 - **Known limits:**
   - **Network:** the script can open network connections (Node 22 does not restrict them). It never sees tokens or passwords, but it can send anything it can read (any non-secret file in the working directory, captured logs, UI dumps) to any host, and reach local services.
@@ -252,7 +252,7 @@ The script runs in a separate Node.js process started with the [permission model
   - **Calls in progress:** a device call already in progress when the run times out still finishes.
   - **Device hosts:** as with the tools, a deploy to a host the script names uses the configured password.
   - **Windows:** not tested yet.
-  - **Large profiles:** parsing a multi-hundred-MB `.bsprof` is synchronous and blocks the server until it finishes; the `roku_run` timeout cannot interrupt it. A script's `filterFile` takes simple globs only (no braces or extglobs).
+  - **Large profiles:** parsing a multi-hundred-MB `.bsprof` is synchronous and blocks the server until it finishes; the `roku_run` timeout cannot interrupt it. A script cannot set `filterFile` (minimatch backtracks on long names); use `filterModule` or filter the report in the script.
   - **Full-mode console patterns:** `roku_console_wait` in full mode uses the normal regex engine, as in 1.9.0, so a catastrophic pattern can stall the server.
 
 ## Command line (rokuctl)
