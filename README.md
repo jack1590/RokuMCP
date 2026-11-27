@@ -234,18 +234,19 @@ return { focused: await roku.ui.focused(), player: await roku.device.mediaPlayer
 
 Calls are `roku.<group>.<call>(options)`, one per SDK operation (`device`, `input`, `ui`, `app`, `console`, `rta`, `profile`, `perfetto`, `stream`, `rce`), with the same options as the matching tool. A failed call throws an error with `code` and `message`. Console sessions, captures and Perfetto recordings persist between `roku_run` calls.
 
-The main saving is the tool list itself: on the fake devices in the test suite (`npm run bench`), it shrinks from about 12,000 to about 1,000 tokens, every session. The three measured flows also take one call instead of 3, 12 and 4, while each call's own bytes change little (results in [`bench/results.json`](./bench/results.json)). Tokens are estimated as bytes / 4. The bench does not measure model reasoning per round trip, the earlier results a model re-reads each turn, or the cost of writing the script, so the real saving per flow depends on the agent.
+The main saving is the tool list itself: on the fake devices in the test suite (`npm run bench`), it shrinks from about 12,000 to about 1,000 tokens, every session. The three measured flows also take one call instead of 3, 12 and 4, and each flow's own bytes shrink by about half (results in [`bench/results.json`](./bench/results.json)). Tokens are estimated as bytes / 4. The bench does not measure model reasoning per round trip, the earlier results a model re-reads each turn, or the cost of writing the script, so the real saving per flow depends on the agent.
 
 ### What a script can and cannot do
 
-The script runs in a separate Node.js process started with the [permission model](https://nodejs.org/api/permissions.html) and no grants: no file system, no child processes, no workers, no native addons, no inspector, and an empty environment. Before the script runs, `process.kill` and the other signal functions are removed, `node:sqlite` is disabled, and the process refuses to run if either is still reachable. Every `roku.*` call goes to the server, which checks it against the command list and the tool's input schema before running it. Secrets (`ROKU_RCE_TOKEN`, passwords) stay in the server, and errors come back as `code` and `message`, with secrets removed and no stack trace.
+The script runs in a separate Node.js process started with the [permission model](https://nodejs.org/api/permissions.html) and no grants: no file system, no child processes, no workers, no native addons, no inspector, and an empty environment. Before the script runs, `process.kill` and the other signal functions are removed, `os.setPriority` and `trace_events` are stubbed, `node:sqlite` is disabled, and the process refuses to run if signals or `node:sqlite` are still reachable. Every `roku.*` call goes to the server, which checks it against the command list and the tool's input schema before running it. Secrets (`ROKU_RCE_TOKEN`, passwords) stay in the server, and errors come back as `code` and `message`, with secrets removed and no stack trace.
 
 - **Files:** `roku.fs.read(path)` and `roku.fs.list(path)` read inside the server's working directory. `roku.fs.write(path, text)` creates data files only (`.json`, `.txt`, `.log`, `.csv`, `.md`, `.png`, `.trace`, ...) and only inside `roku-run/`. Console captures, screenshots and traces given a folder go there too. Paths that leave the working directory, follow a symlink out of it, or name secret files are refused: `.env*`, `*.env`, `.npmrc`, `.git-credentials`, `mcp.json`, `opencode.json`, `bsconfig*.json`, `rokudeploy*.json`, key files, and folders such as `.git`, `.ssh`, `.vscode`, `.cursor` and `.claude`.
 - **Deploy:** `rootDir` must hold no secret file and no symlink. `files` and `stagingDir` cannot be set from a script.
-- **Perfetto SQL:** `roku.perfetto.query` takes one read-only `SELECT` or `WITH` statement, because `trace_processor` runs with the server's rights.
+- **Perfetto SQL:** `roku.perfetto.query` takes one read-only `SELECT` or `WITH` statement, because `trace_processor` runs with the server's rights. Words such as `replace`, `update`, `create` and `attach` are refused anywhere in the SQL, even as function or column names.
 - **Limits:** 30 s by default (`timeoutMs`, at most 300 s), a 128 MB JavaScript heap, a 100 KiB return value, 64 KiB of logs, and 5,000 calls per run.
+- **Billing:** `roku.rce.start` in a script starts a billed Cloud Device Run ($0.20 per hour, never stopped when idle). A script stops it in `finally` only if the script ends normally: when `roku_run` kills it for a timeout, memory or a crash, the Run keeps billing. Check `roku_rce_status` and call `roku_rce_stop`. The server still stops the Runs it started when it shuts down.
 - **Known limits:**
-  - **Network:** the script can open network connections (Node 22 does not restrict them). It holds no secrets, but it can reach local services.
+  - **Network:** the script can open network connections (Node 22 does not restrict them). It never sees tokens or passwords, but it can send anything it can read (any non-secret file in the working directory, captured logs, UI dumps) to any host, and reach local services.
   - **Memory:** the heap limit does not count `ArrayBuffer` memory, so a script can allocate large buffers until its timeout.
   - **Calls in progress:** a device call already in progress when the run times out still finishes.
   - **Device hosts:** as with the tools, a deploy to a host the script names uses the configured password.
@@ -265,7 +266,7 @@ rokuctl ui.app-ui --out ui.xml
 
 - **Output:** exactly one JSON object on stdout, `{"ok":true,"data":...}` or `{"ok":false,"error":{"code":"...","message":"..."}}`.
 - **Exit codes:** 0 ok, 1 device or tool error, 2 usage error, 3 timeout.
-- **Large output:** screenshots and results over 64 KiB are written only to `--out <file>`.
+- **Large output:** a result over 64 KiB fails with `output_too_large` (exit 2); run it again with `--out <file>`. Screenshot bytes never go to stdout (stdout shows their size); `--out` saves them.
 - **Options:** kebab-case (`--rce-device`, `--delay-ms`), or one `--json '{...}'` object. `--timeout <ms>` bounds the whole command.
 - **Passwords:** come from the environment or `.env`; a password flag is refused.
 - **Session commands:** the single-shot console, step-by-step capture and Perfetto recording keep state between calls, so they exist only in code mode. `console.capture` covers capture, wait and stop in one command.

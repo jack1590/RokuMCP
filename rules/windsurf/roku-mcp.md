@@ -89,6 +89,7 @@ return { focused: await roku.ui.focused(), found: (await roku.ui.find({ attr: 't
 - Calls are `roku.<group>.<call>(options)`, with the same options as the matching tool. Look them up with `roku_sdk_docs` (no query: the list; with a query: option schemas). Groups: `device`, `input`, `ui`, `app`, `console`, `rta`, `profile`, `perfetto`, `stream`, `rce`, plus `roku.fs.read`, `roku.fs.write` and `roku.fs.list`.
 - Pass `host` or `rceDevice` to `roku_run` to target every call; the usual environment and discovery apply otherwise.
 - A failed call throws an Error with `code` and `message`: catch it to recover, or let it end the run (`ok: false`). Stop Cloud Device Runs and console captures in `finally`.
+- `roku.rce.start` starts a billed Run ($0.20 per hour, never stopped when idle). If `roku_run` kills the script (timeout, memory, crash), its `finally` does not run: check `roku_rce_status` and call `roku_rce_stop`.
 - Paths stay inside the server's working directory; secret files (`.env`, `mcp.json`, `bsconfig.json`, keys) are refused. Writes create data files only, under `roku-run/`. Deploy a build folder (no `files`, no `stagingDir`). `roku.perfetto.query` takes one read-only `SELECT`.
 - Limits: 30 s by default (`timeoutMs` up to 300000), 100 KiB return value, 64 KiB logs. Return a summary, or write big results with `roku.fs.write` and return the path.
 - Take images with `roku_screenshot`; a script cannot return an image.

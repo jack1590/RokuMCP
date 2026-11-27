@@ -3,17 +3,19 @@
 ## [1.10.0] - 2026-11-27
 
 ### Added
-- Code mode: `ROKU_MCP_MODE=code` (also the plugin's "Server mode" setting) replaces the 46 tools with `roku_run`, `roku_sdk_docs` and `roku_screenshot`. `roku_run` runs an agent-written async function body against the SDK, so a multi-step flow is one tool call. Calls are `roku.<group>.<call>(options)` with the same options as the matching tool; `roku_sdk_docs` lists them and their option schemas. Needs Node.js 22.13 or later. Full mode stays the default and is unchanged.
-- The `roku_run` sandbox: a separate Node.js process with the permission model and no grants (no file system, child processes, workers, addons or inspector), an empty environment, the signal functions removed and `node:sqlite` disabled. It refuses to run if either is still reachable. Every call goes to the server, which checks it against the command list and the tool schema. File access through `roku.fs.read`, `roku.fs.list` and SDK path options stays inside the working directory and refuses secret files (`.env*`, `*.env`, `mcp.json`, `opencode.json`, `bsconfig*.json`, `rokudeploy*.json`, keys, `.git`, `.vscode`, `.cursor`, `.claude` and similar). `roku.fs.write`, captures, screenshots and traces write data files only, under `roku-run/`. Deploys from a script refuse `files`, `stagingDir` and a `rootDir` holding secrets or symlinks; `roku.perfetto.query` takes one read-only `SELECT`. Limits: 30 s by default (300 s at most), 128 MB of heap, a 100 KiB result, 64 KiB of logs and 5,000 calls. Errors are `{code, message}` with secrets redacted and no stack.
-- `rokuctl`: the SDK from a shell or CI (`npx -p roku-mcp rokuctl help`). One JSON object on stdout, exit codes 0/1/2/3, binary and large output only through `--out`, passwords only from the environment. `console.capture` captures, waits for a line and stops in one command. An interrupted `rce.start` stops the Run it started.
-- `src/sdk/`: the device logic behind every tool, as functions that return data (`createRoku()` binds a default device). The MCP tools, `rokuctl` and `roku_run` share it, and the tools are thin wrappers.
-- `npm run bench`: tool-list size and calls per flow, full mode against code mode, on fake devices (`bench/results.json`).
-- Task-level skills with numbered steps, the code-mode and `rokuctl` forms, and a recovery table; a new `e2e-check` skill.
-- Tests: a parity harness that records 214 tool calls and the tool list on v1.9.0 and checks them on every run, plus sandbox, CLI and docs-drift tests.
+- Code mode, for Node.js 22.13 or later: set `ROKU_MCP_MODE=code` (or the plugin's "Server mode" setting) and the server offers `roku_run`, `roku_sdk_docs` and `roku_screenshot` instead of the 46 tools. `roku_run` runs a short script against the SDK (`roku.<group>.<call>(options)`, the same options as the matching tool), so a multi-step flow is one tool call. `roku_sdk_docs` lists the calls and their options. Full mode stays the default and is unchanged.
+- `rokuctl`, the same operations from a shell or CI: `npx -p roku-mcp rokuctl help`. It prints one JSON object, exits 0/1/2/3, writes large or binary output only with `--out`, and takes passwords only from the environment. `console.capture` captures the console, waits for a line and stops in one command. An interrupted `rokuctl rce.start` stops the Run it started.
+- Task-level skills with numbered steps, code-mode and `rokuctl` forms and a recovery table, and a new `e2e-check` skill.
+- `npm run bench`: tool-list size and calls per flow, full mode against code mode, on fake devices.
 
-### Known limits
-- Code mode on Windows is not tested yet.
-- A script can open network connections (Node 22 does not restrict them) and allocate `ArrayBuffer` memory outside the heap limit until its timeout.
+### Security
+- `roku_run` scripts run in a separate Node.js process: no file system, no child processes, no environment, no signals to other processes, no `node:sqlite`. Tokens and passwords stay in the server.
+- Paths stay inside the server's working directory, and secret files are refused (`.env*`, `*.env`, `mcp.json`, `opencode.json`, `bsconfig*.json`, `rokudeploy*.json`, keys, `.git`, `.vscode`, `.cursor`, `.claude`, ...). Writes create data files only, under `roku-run/`. A deploy from a script refuses `files`, `stagingDir` and a `rootDir` holding secrets or symlinks. `roku.perfetto.query` takes one read-only `SELECT`.
+- Limits per run: 30 s by default (300 s at most), 128 MB of heap, a 100 KiB result, 64 KiB of logs, 5,000 calls.
+- Known limits: a script can open network connections and send what it can read, and its `ArrayBuffer` memory is not capped until the timeout. A Cloud Device Run started by a script that `roku_run` kills is not stopped until the server shuts down. Code mode is not tested on Windows yet.
+
+### Changed
+- The tools now share one SDK (`src/sdk/`) with `rokuctl` and `roku_run`. Tool names, inputs and outputs are unchanged; a test compares 214 recorded calls and the tool list with 1.9.0.
 
 ## [1.9.0] - 2026-11-25
 
