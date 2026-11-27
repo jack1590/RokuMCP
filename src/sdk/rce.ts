@@ -70,7 +70,13 @@ export async function cloudStart(options: CloudStartOptions = {}) {
     );
   }
   const minutes = options.maxRuntimeMinutes ?? 60;
-  await core.start(device.id, { snapshotId: options.snapshotId, maxRuntime: minutes * 60 });
+  try {
+    await core.start(device.id, { snapshotId: options.snapshotId, maxRuntime: minutes * 60 });
+  } catch (error) {
+    // The request went out: RCE may have created a Run even though the call failed.
+    if (error && typeof error === 'object') Object.assign(error, { startRequested: true });
+    throw error;
+  }
   try {
     const ready = await core.waitUntilReady(device.id, { timeoutMs: 240_000 });
     return { started: true, device: deviceSummary(ready), billing: RCE_BILLING };
@@ -85,15 +91,19 @@ export async function cloudStart(options: CloudStartOptions = {}) {
 }
 
 /**
- * Requests a stop of the device's current Run only if this server started it (no wait for
- * shutdown). For cleanup after a killed roku_run script.
+ * Cleanup after a killed roku_run script: requests a stop (no wait for shutdown) of the Run that
+ * script's start created, and nothing else. With the start's runId, only that Run while it is
+ * still current; without it (the start failed after the request), only a Run this server started
+ * whose creation is no older than the request.
  */
-export async function stopRunStartedHere(rceDevice?: string): Promise<{ deviceId: number; stopped: boolean; runId?: number }> {
+export async function stopScriptRun(rceDevice: string | undefined, known: { runId?: number; requestedAt: number }): Promise<{ deviceId: number; stopped: boolean; runId?: number }> {
   const core = rceCore();
   const device = await core.findDevice(deviceRef(rceDevice));
   const run = device.running_device;
   if (!run || !core.startedHere(device)) return { deviceId: device.id, stopped: false };
-  await core.stop(device.id, { runId: run.id });
+  const ours = known.runId !== undefined ? run.id === known.runId : Date.parse(run.created_at) >= known.requestedAt - 30_000;
+  if (!ours) return { deviceId: device.id, stopped: false };
+  await core.stop(device.id, { runId: run.id }); // refuses if that Run is no longer current
   return { deviceId: device.id, stopped: true, runId: run.id };
 }
 

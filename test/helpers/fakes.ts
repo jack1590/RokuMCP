@@ -202,6 +202,7 @@ export function rceDevices(): RceDevice[] {
 export function stubRce(world: FakeWorld): RceClientLike {
   const devices = rceDevices();
   const started = new Set<number>();
+  let nextRunId = 9500;
   const find = (ref: string | number) => {
     const d = devices.find((x) => String(x.id) === String(ref) || x.name === ref);
     if (!d) throw new RceError(`No Cloud Device matches "${ref}"`, { code: 'not_found' });
@@ -249,7 +250,7 @@ export function stubRce(world: FakeWorld): RceClientLike {
       world.log(`rce start ${id} ${JSON.stringify(o)}`);
       if (world.trackRuns) {
         const d = find(id);
-        const run = { ...RUN, id: 9500 + id, created_at: new Date().toISOString() };
+        const run = { ...RUN, id: nextRunId++, created_at: new Date().toISOString() }; // RCE never reuses a Run id
         Object.assign(d, { status: 'running', running_device: run });
         started.add(run.id);
       }

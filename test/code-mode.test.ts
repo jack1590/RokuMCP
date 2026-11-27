@@ -568,7 +568,7 @@ test('a killed script has the Cloud Device Runs it started stopped, also one sti
     world.readyDelayMs = 1500;
     r = await run(`roku.rce.start({ rceDevice: '402' }); await new Promise(() => {})`, { timeoutMs: 500 });
     assert.equal(r.error?.code, 'timeout');
-    assert.match(r.error!.message, /still starting will be stopped once it is up/);
+    assert.match(r.error!.message, /still starting will be stopped once the start returns/);
     await new Promise((res) => setTimeout(res, 2000));
     assert.ok(world.calls.some((c) => c.startsWith('rce stop 402')), world.calls.join('\n'));
 
@@ -584,6 +584,23 @@ test('a killed script has the Cloud Device Runs it started stopped, also one sti
     world.calls = [];
     r = await run(`await roku.rce.start({ rceDevice: '400' }).catch(() => 0); while (true) {}`, { timeoutMs: 800 });
     assert.ok(!world.calls.some((c) => c.startsWith('rce stop')));
+
+    // Script A starts and stops 402, then hangs; script B starts 402 and keeps it. A's cleanup must not stop B's Run.
+    world.calls = [];
+    const a = run(`await roku.rce.start({ rceDevice: '402' }); await roku.rce.stop({ rceDevice: '402' }); await new Promise((res) => setTimeout(res, 300)); while (true) {}`, { timeoutMs: 1500 });
+    await new Promise((res) => setTimeout(res, 600));
+    const b = await runSnippet({ code: `await roku.rce.start({ rceDevice: '402' }); return 'mine'`, rceDevice: '400' });
+    assert.equal(b.result, 'mine');
+    const ra = await a;
+    assert.equal(ra.error?.code, 'timeout');
+    const stops = world.calls.filter((c) => c.startsWith('rce stop 402'));
+    assert.equal(stops.length, 1, `only A's own stop: ${stops.join(' | ')}`);
+
+    // A start that never reached RCE (no such device) is not reported as maybe billing; many such calls keep the message short.
+    r = await run(`for (let i = 0; i < 300; i++) await roku.rce.start({ rceDevice: 'nope' }).catch(() => 0); while (true) {}`, { timeoutMs: 1500 });
+    assert.equal(r.error?.code, 'timeout');
+    assert.ok(!/billing|Could not confirm/.test(r.error!.message), r.error!.message);
+    assert.ok(r.error!.message.length < 1500);
   } finally {
     world.trackRuns = false;
     world.readyDelayMs = 0;

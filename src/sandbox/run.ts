@@ -12,7 +12,8 @@ import { fileURLToPath } from 'url';
 import { COMMANDS, commandShape, parseCommandInput, type Command } from '../commands.js';
 import type { TargetParams } from '../roku-config.js';
 import { describeError, type ErrorInfo } from '../sdk/describe.js';
-import { stopRunStartedHere } from '../sdk/rce.js';
+import { stopScriptRun } from '../sdk/rce.js';
+import { RceError } from 'roku-rce';
 import { withDefaults } from '../sdk/defaults.js';
 import { RokuError } from '../sdk/errors.js';
 import { toPlain } from '../sdk/json.js';
@@ -156,37 +157,35 @@ class Dispatcher {
   closed = false;
   /** This run's calls waiting for a free slot. */
   queued = 0;
-  /** Cloud Device starts this run made: the device, and whether a Run may have been started. */
-  private readonly rceStarts: Array<{ ref: string | undefined; outcome: Promise<boolean>; done: boolean }> = [];
-
-  /**
-   * After roku_run killed the script: stops each Cloud Device Run it started. A start still in
-   * flight is stopped once it finishes. Resolves with a sentence for the error message.
-   */
-  async stopRunsAfterKill(): Promise<string> {
-    if (this.rceStarts.length === 0) return '';
-    const notes: string[] = [];
-    const stop = async (ref: string | undefined) => {
-      try {
-        const r = await stopRunStartedHere(ref);
-        return r.stopped ? `Stopped the Cloud Device Run it started on device ${r.deviceId}.` : '';
-      } catch (error) {
-        return `Could not stop the Cloud Device Run it started (${describeError(error).message}): it may still be billing; check roku_rce_status.`;
-      }
-    };
-    for (const s of this.rceStarts) {
-      if (s.done) {
-        if (await s.outcome) notes.push(await stop(s.ref));
-      } else {
-        // Still starting: stop it as soon as the start returns (it bills from the start request).
-        void s.outcome.then((started) => (started ? stop(s.ref) : ''));
-        notes.push('A Cloud Device Run it was still starting will be stopped once it is up.');
-      }
-    }
-    return notes.filter(Boolean).map((n) => ' ' + n).join('');
-  }
   /** This run's waits in flight (still counted after the run ends, until they finish). */
   private waits = 0;
+  /** Cloud Device starts this run made that may have created a Run. */
+  private readonly rceStarts: Array<{ ref: string | undefined; requestedAt: number; runId?: number; outcome: Promise<boolean>; done: boolean }> = [];
+
+  /**
+   * After roku_run killed the script: stops each Cloud Device Run its starts created (in parallel,
+   * within 10 s). A start still in flight is stopped once it returns. Resolves with a sentence for
+   * the error message; never rejects.
+   */
+  async stopRunsAfterKill(): Promise<string> {
+    const done = this.rceStarts.filter((s) => s.done);
+    const pending = this.rceStarts.filter((s) => !s.done);
+    const stopOne = async (s: (typeof this.rceStarts)[number]) => {
+      if (!(await s.outcome)) return '';
+      try {
+        const r = await stopScriptRun(s.ref, s);
+        return r.stopped ? `Stopped the Cloud Device Run it started on device ${r.deviceId}.` : '';
+      } catch (error) {
+        return `Could not confirm the stop of the Cloud Device Run it started (${describeError(error).message.slice(0, 200)}); check roku_rce_status.`;
+      }
+    };
+    for (const s of pending) void s.outcome.then(() => stopOne(s)).catch(() => undefined);
+    const deadline = new Promise<string[]>((resolve) => setTimeout(() => resolve(['Stopping the Cloud Device Runs it started is taking long; check roku_rce_status.']), 10_000).unref());
+    const notes = await Promise.race([Promise.all(done.map(stopOne)), deadline]);
+    if (pending.length) notes.push('A Cloud Device Run it was still starting will be stopped once the start returns.');
+    const text = [...new Set(notes.filter(Boolean))].join(' ');
+    return text ? ' ' + text.slice(0, 600) : '';
+  }
 
   /** Runs dispatch in its lane (at most lane.max calls at once across all runs). */
   async enqueue(name: unknown, args: unknown): Promise<unknown> {
@@ -283,16 +282,28 @@ class Dispatcher {
 
   /** Records a Cloud Device start so a killed script's Run can be stopped. */
   private trackStart(command: Command, input: Record<string, unknown>): Promise<unknown> {
-    const call = Promise.resolve(command.run(input));
     const entry = {
       ref: (input.rceDevice as string | undefined) || process.env.ROKU_RCE_DEVICE,
+      requestedAt: Date.now(),
+      runId: undefined as number | undefined,
       done: false,
-      // A refused start (the device already had a Run) started nothing; any other outcome may have.
-      outcome: call.then(
-        () => true,
-        (e: unknown) => !(e instanceof RokuError && e.code === 'run_exists')
-      ),
+      outcome: Promise.resolve(false),
     };
+    const call = Promise.resolve(command.run(input));
+    entry.outcome = call.then(
+      (result) => {
+        entry.runId = (result as { device?: { run?: { runId?: number } | null } })?.device?.run?.runId;
+        return true;
+      },
+      // Started and billing: not_ready, or a failure of the start request itself that is not a
+      // 4xx refusal. Failures before the request (no device, unknown device, run_exists) started nothing.
+      (e: unknown) => {
+        if (e instanceof RokuError) return e.code === 'not_ready';
+        const requested = !!(e as { startRequested?: boolean } | null)?.startRequested;
+        const refused = e instanceof RceError && (e.status ?? 0) >= 400 && (e.status ?? 0) < 500;
+        return requested && !refused;
+      }
+    );
     void entry.outcome.then(() => (entry.done = true));
     this.rceStarts.push(entry);
     return call;
@@ -401,10 +412,13 @@ export async function runSnippet(options: RunOptions): Promise<RunResult> {
       const finish = () => resolve({ ...r, files: [...dispatcher.files], calls: dispatcher.calls });
       // The script was killed, so its finally blocks never ran: stop the Runs it started.
       if (r.error?.sandbox && KILLED.has(r.error.code)) {
-        void dispatcher.stopRunsAfterKill().then((note) => {
-          if (note && r.error) r.error.message += note;
-          finish();
-        });
+        void dispatcher
+          .stopRunsAfterKill()
+          .then((note) => {
+            if (note && r.error) r.error.message += note;
+          })
+          .catch(() => undefined)
+          .finally(finish);
       } else {
         finish();
       }
