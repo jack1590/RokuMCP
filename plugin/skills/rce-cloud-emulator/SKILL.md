@@ -1,33 +1,57 @@
 ---
 name: rce-cloud-emulator
-description: Start, use, and stop a Roku Cloud Emulator (RCE) Cloud Device with roku-mcp, keeping billed Run time short. Use when the user asks to test on RCE, a cloud Roku, or a Cloud Device, or names a Cloud Device id or name.
+description: Test a Roku channel on a Roku Cloud Emulator (RCE) Cloud Device, starting and stopping its billed Run safely. Use when the user asks to test on RCE, a cloud Roku or a Cloud Device, or names a Cloud Device id or name.
 ---
 
-# Roku Cloud Emulator (RCE)
+# Use a Cloud Device
 
-RCE runs Roku devices in the cloud. A Cloud Device is permanent; each boot of it is a Run.
+A Cloud Device is permanent; each boot of it is a Run. **A Run costs $0.20 per hour, billed per minute from the start request, and RCE never stops an idle Run.** Start one only when the user asked, keep `maxRuntimeMinutes` low (default 60, at most 240), and always stop it, after a failure too.
 
-**Billing.** A Run costs $0.20 per hour, billed per minute from the start request. RCE never stops an idle Run; only the maximum runtime cap ends it. Start a Run only when the user asked for one, keep `maxRuntimeMinutes` as low as the task allows (the default is 60), and always end with `roku_rce_stop`, also after a failure.
+Configuration: `ROKU_RCE_TOKEN` (required, in the environment or `.env`, never pasted into chat), `ROKU_RCE_DEVICE` (default Cloud Device), `ROKU_RCE_PASSWORD` (developer password, for deploy, delete and screenshot).
 
-## Configuration
+## Steps
 
-- `ROKU_RCE_TOKEN` (required): the RCE personal access token. It never appears in tool output. Never ask the user to paste it into chat; it belongs in the environment or the `.env` file.
-- `ROKU_RCE_DEVICE` (optional): the default Cloud Device id or exact name. When it is set, device tools target it unless you pass `host`.
-- `ROKU_RCE_PASSWORD` (optional): the Cloud Device developer password, needed by `roku_deploy`, `roku_delete_dev_channel` and `roku_screenshot`.
-
-## Workflow
-
-1. `roku_rce_list_devices`: find the Cloud Device and check that `run` is null. If it already has a Run that this server did not start, ask the user before touching it.
+1. `roku_rce_list_devices`: find the Cloud Device; check that `run` is null. If another client started a Run, ask the user before touching it.
 2. `roku_rce_status rceDevice=<id>`: pick a Snapshot if the user named one.
-3. `roku_rce_start rceDevice=<id> [snapshotId=<id>] maxRuntimeMinutes=<n>`: waits until the device takes input (about 35 to 50 seconds).
-4. Work with the usual tools and `rceDevice=<id>`:
-   - `roku_console_capture_start`, then `roku_deploy rootDir=<dir>`, then `roku_console_wait pattern="<marker>"`.
-   - `roku_query_active_app`, `roku_keypress`, `roku_screenshot`.
+3. `roku_rce_start rceDevice=<id> [snapshotId=<id>] maxRuntimeMinutes=<n>`: waits until the device takes input (about 35 to 50 s).
+4. Work with the usual tools and `rceDevice=<id>`: capture the console, deploy, wait for the marker line, press keys, take screenshots.
 5. `roku_rce_stop rceDevice=<id>`, then `roku_rce_status` to confirm `status: "shutdown"`.
 
-## Limits on a Cloud Device
+### In code mode (`roku_run`)
 
-- In the default "Limited" ECP mode, `roku_query_app_ui`, `roku_query_sg_nodes`, `roku_find_node`, `roku_get_focused_node` and `roku_query_media_player` fail with a 403. The fix is on the device: Settings > System > Advanced system settings > Control by mobile apps > Network access > Permissive, then save a new Snapshot and start from it. Tell the user; do not retry in a loop.
-- The runtime UI editing tools try an RCE bridge to port 9000. This path is unverified. A closed-port error means the channel has no RTA, or RCE does not bridge port 9000.
-- `roku_perfetto_enable`, `roku_perfetto_start`, `roku_discover` and `roku_diagnose_stream` with `captureLive` are not supported on RCE.
-- No tool creates or deletes Cloud Devices.
+Pass `rceDevice` to `roku_run` so every call targets the Cloud Device; stop the Run in `finally`.
+
+```js
+await roku.rce.start({ rceDevice: '400', maxRuntimeMinutes: 15 });
+try {
+  await roku.console.captureStart({ settleMs: 0 });
+  await roku.app.deploy({ rootDir: 'dist' });
+  return await roku.console.wait({ pattern: 'HomeScreen ready', timeoutMs: 90000 });
+} finally {
+  await roku.console.captureStop();
+  await roku.rce.stop({ rceDevice: '400' });
+}
+```
+
+Give this `roku_run` a `timeoutMs` of about 300000: the start alone can take a minute.
+
+### From a shell (`rokuctl`)
+
+```sh
+rokuctl rce.start 400 --max-runtime-minutes 15
+rokuctl app.deploy ./dist --rce-device 400
+rokuctl rce.stop 400
+```
+
+Interrupting `rokuctl rce.start` (Ctrl-C or `--timeout`) stops the Run it started; a finished `rce.start` leaves the Run up on purpose.
+
+## When it goes wrong
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| "already has a Run" | A Run is up (maybe another person's) | Check `roku_rce_status`; ask before stopping it |
+| "started and is billing, but it did not become ready" | The Run never took input | `roku_rce_status`, then `roku_rce_stop` if it is not needed |
+| 403 "ECP command not allowed in Limited mode" on UI queries | Snapshot in Limited ECP mode | The user switches Settings > System > Advanced system settings > Control by mobile apps > Network access > Permissive, saves a new Snapshot and starts from it. Do not retry in a loop |
+| "Port 9000 did not answer through the Roku Cloud Emulator bridge" | No RTA in the channel, or RCE does not bridge 9000 (unverified) | Use a LAN device for live UI editing |
+| `roku_perfetto_*`, `roku_discover`, or `captureLive` refused | Not supported on RCE | Use a LAN device |
+| "needs ROKU_RCE_TOKEN" | Token not set | The user adds it to `.env`; never ask for it in chat |

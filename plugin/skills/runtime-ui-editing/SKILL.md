@@ -1,34 +1,40 @@
 ---
 name: runtime-ui-editing
-description: Edit a running Roku SceneGraph UI at runtime through the RTA On-Device Component (port 9000) using roku_edit_node, roku_get_value, roku_set_node_visible, roku_move_node, roku_focus_node, roku_create_node, roku_remove_node, roku_observe_field. Use when the user asks to change a title, hide a node, or mutate a field without redeploying.
+description: Change a running Roku SceneGraph UI without redeploying (change a label, hide or move a node, focus it, add or remove one) and read a field or wait for it to change, through the RTA On-Device Component. Use when the user asks to tweak the UI live, try a layout change, or wait until a field (such as video state) reaches a value.
 ---
 
-# Runtime UI editing (RTA)
+# Change the UI live
 
-RTA is the On-Device Component on TCP 9000. It is not the debug console.
+RTA is an On-Device Component the channel must include. It listens on TCP 9000 and is not the debug console.
 
-## Requirements
+## Steps
 
-1. Dev channel running: `roku_query_active_app` shows `ui-location` = `dev`.
-2. RTA present. Any of: `roku_query_sg_nodes type=roots` lists `RTA_OnDeviceComponent`; nodes in `roku_query_app_ui` carry `uiElementId="RTA_<digits>"`; device log shows `[RTA][INFO] OnDeviceComponent init`.
-3. If RTA is missing, tell the user to either bundle the RTA OnDeviceComponent, or set `"injectRdbOnDeviceComponent": true` in `launch.json` and add `' vscode_rdb_on_device_component_entry` after `screen.show()` in `main()`.
+1. Check that a dev channel runs: `roku_query_active_app` shows `ui-location` = `dev`.
+2. Check that RTA is present: `roku_query_sg_nodes type=roots` lists `RTA_OnDeviceComponent`, or nodes in `roku_query_app_ui` carry `uiElementId="RTA_<digits>"`.
+3. Find the node: `roku_query_app_ui`, locate the visible text, copy that element's `uiElementId`. Never use `name`: it is not addressable and the call returns OK with no change.
+4. Read the current value: `roku_get_value nodeId="RTA_<n>" field="<field>"`.
+5. Change it: `roku_edit_node nodeId="RTA_<n>" fields={...}` (or `roku_set_node_visible`, `roku_move_node`, `roku_focus_node`, `roku_create_node`, `roku_remove_node`).
+6. Read it again with `roku_get_value`. An OK reply alone is not proof.
+7. To wait for a change (e.g. video starts): `roku_observe_field nodeId=... field=... match=...`.
 
-## Rule
+### In code mode (`roku_run`)
 
-Use `uiElementId` (`RTA_<digits>`). Never use `name`: it is not addressable and the call returns OK with no visible change.
+```js
+const [title] = await roku.ui.find({ attr: 'text', value: "America's Newsroom" });
+const id = title.uiElementId;
+const before = await roku.rta.get({ nodeId: id, field: 'text' });
+await roku.rta.edit({ nodeId: id, fields: { text: 'Hello' } });
+const after = await roku.rta.get({ nodeId: id, field: 'text' });
+return { id, before: before.value, after: after.value };
+```
 
-## Workflow: "change the title to X"
+## When it goes wrong
 
-1. `roku_query_app_ui`, find the element with the visible text. Copy its `uiElementId`.
-2. `roku_get_value nodeId="RTA_<n>" field="<field>"`: record current value.
-3. `roku_edit_node nodeId="RTA_<n>" fields={...}`.
-4. `roku_get_value` again. OK status alone is not proof.
-
-## Why "OK but nothing changed"
-
-- Used `name` instead of `uiElementId`.
-- Parent is `LayoutGroup`, `RowList`, or `MarkupGrid`: its next layout pass overwrites `translation`/`width`/`height`. Change the parent or detach the child.
-- An observer rewrites the field each tick: mutate the bound model node.
-- Row was recycled: re-query for a fresh id.
-- Wrong field for the subtype: `roku_get_value` returns `found: false`.
-- RowList children: change the underlying `ContentNode`, not the child.
+| Symptom | Cause | Fix |
+|---|---|---|
+| OK, but nothing changed | Used `name` instead of `uiElementId` | Re-read the tree and use `RTA_<digits>` |
+| OK, then the value snaps back | Parent `LayoutGroup`, `RowList` or `MarkupGrid` relays out, or an observer rewrites the field | Change the parent, or the bound `ContentNode` |
+| `found: false` | Wrong field name for that subtype | Check the field on the node in `roku_query_app_ui` |
+| Connection refused, "RTA socket closed" | The channel has no RTA | Tell the user: bundle the RTA OnDeviceComponent, or set `"injectRdbOnDeviceComponent": true` in `launch.json` and add `' vscode_rdb_on_device_component_entry` after `screen.show()` in `main()` |
+| "Port 9000 did not answer through the Roku Cloud Emulator bridge" | Cloud Device: no RTA, or RCE does not bridge 9000 (unverified) | Use a LAN device for live editing |
+| Id stopped working | A row was recycled | Query the tree again for a fresh id |

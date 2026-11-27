@@ -1,30 +1,45 @@
 ---
 name: deploy-debug
-description: Sideload a Roku BrightScript/SceneGraph app to a dev device, redeploy after changes, and read the BrightScript debug console for crashes and prints. Use when the user wants to deploy, redeploy, or attach to the console.
+description: Sideload a Roku channel, redeploy after a change, and read what the BrightScript debug console says (crashes, prints, a log line you are waiting for). Use when the user wants to deploy or redeploy, find out why the channel crashed, or wait for a specific log line.
 ---
 
-# Deploy and debug a channel
+# Deploy and read the console
 
-## Deploy
+## Steps
 
-1. Confirm `<rootDir>/manifest` exists. The tool fails otherwise.
-2. `roku_deploy` with `rootDir` (absolute path). Pass `files` only for a non-default glob; the default is `**/*`.
-3. `roku_sleep` 3000–5000 ms before any UI interaction so the channel finishes launching.
+1. Check that `<rootDir>/manifest` exists. Deploy the build folder, not the repo root.
+2. Start a console capture before the deploy, so startup output is kept: `roku_console_capture_start` (port 8085 takes one client: detach the VS Code debugger first).
+3. Deploy: `roku_deploy rootDir=<absolute path>`. It replaces the dev channel and cold-starts it.
+4. Wait for the line that proves the step worked: `roku_console_wait pattern="<regex>"` (add `predicate=jwtValid` to require an unexpired `Authorization: Bearer` token).
+5. Stop: `roku_console_capture_stop`. Read the matched line from the capture file; do not paste raw console output into chat.
+6. After a crash, connect and ask for the backtrace: `roku_console_connect`, then `roku_console_send command=bt` (each connect serves one read or send).
 
-Deploying replaces the installed dev channel and cold-starts it. `roku_delete_dev_channel` removes it. On a Roku Cloud Emulator Cloud Device, pass `rceDevice` (see the `rce-cloud-emulator` skill).
+### In code mode (`roku_run`)
 
-## Console
+```js
+const cap = await roku.console.captureStart({ settleMs: 0 });
+await roku.app.deploy({ rootDir: 'dist' });
+const line = await roku.console.wait({ pattern: 'HomeScreen ready', timeoutMs: 60000 });
+const summary = await roku.console.captureStop();
+return { line, file: summary.file };
+```
 
-- `roku_console_connect` opens a connection for one `roku_console_read` or `roku_console_send` call, which then closes it. Do not expect a persistent session; use the capture tools below to stream.
-- Read after a repro step, not in a loop.
+Captures from `roku_run` are written under `roku-run/`. A deploy from `roku_run` refuses a `rootDir` that holds secret files or symlinks, and refuses `files` and `stagingDir`.
 
-## Capture to a file and wait for a line
+### From a shell (`rokuctl`)
 
-1. `roku_console_capture_start` (optional `file`; default `./logs/<ts>-rokuDevice.log`). Detach the VS Code debugger first: 8085 takes one client.
-2. `roku_deploy` for a cold start, or `roku_launch appId=dev restart=true` (instant-resume channels resume instead of restarting).
-3. `roku_console_wait pattern="<regex>"` (add `predicate=jwtValid` to require a non-expired `Authorization: Bearer` token).
-4. `roku_console_capture_stop`. Read the matched line from the file; don't paste raw console output into chat.
+```sh
+rokuctl app.deploy ./dist
+rokuctl console.capture "HomeScreen ready" --timeout-ms 60000 --settle-ms 0 --file logs/startup.log
+```
 
-## Screenshot
+## When it goes wrong
 
-`roku_screenshot` once per significant UI change. Do not screenshot in a tight loop.
+| Symptom | Cause | Fix |
+|---|---|---|
+| "No manifest file found at ..." | `rootDir` is not the channel folder | Point it at the folder with `manifest` |
+| `reason: "waiting_for_debugger"` | Channel was sideloaded by the VS Code debugger and waits on 8081 | Redeploy with `roku_deploy` |
+| `reason: "timeout"` after `roku_launch restart=true` | Instant resume: no startup code ran | Use `roku_deploy` for a cold start |
+| "Capture already active" or console connect refused | Port 8085 holds one client | `roku_console_capture_stop`, or detach the other client |
+| "developer password is required" | No password in the environment | Ask the user to set `ROKU_DEVICE_PASSWORD` (or `ROKU_RCE_PASSWORD`) in `.env` |
+| "stagingDir must not be rootDir, inside it, or contain it" | roku-deploy empties and deletes the staging folder | Leave `stagingDir` unset |
