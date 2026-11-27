@@ -456,3 +456,21 @@ test('review fixes 6: one queue across runs, waits skip it, a slow-drip fetch is
     server.close();
   }
 });
+
+test('review fixes 7: calls a run leaves running keep their queue slots', { skip, timeout: 60_000 }, async () => {
+  const http = await import('node:http');
+  const server = http.createServer((_req, res) => void setTimeout(() => res.end('#EXTM3U\n'), 3000));
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+  const port = (server.address() as { port: number }).port;
+  try {
+    const a = await run(`for (let i = 0; i < 2; i++) roku.stream.diagnose({ url: 'http://127.0.0.1:${port}/s.m3u8' }).catch(() => 0); return 'left them running';`);
+    assert.equal(a.ok, true);
+    const t = Date.now();
+    const b = await run(`await roku.input.keypress({ key: 'Up' }); return 1`, { timeoutMs: 20_000 });
+    assert.equal(b.ok, true, JSON.stringify(b.error));
+    assert.ok(Date.now() - t >= 1500, `the next run got fresh slots after ${Date.now() - t} ms`);
+  } finally {
+    server.closeAllConnections();
+    server.close();
+  }
+});

@@ -29,6 +29,8 @@ export const RUN_LIMITS = {
   maxParseBytes: 5 * 1024 * 1024,
   /** Calls running at once across all runs; more wait in a queue (CPU-heavy parses cannot pile up). */
   maxInFlight: 2,
+  /** Longest a call holds a queue slot. */
+  maxSlotMs: 60_000,
 };
 
 /** Node's permission model without the experimental flag: 22.13+ (and 23.5+). */
@@ -111,7 +113,7 @@ function childEnv(): NodeJS.ProcessEnv {
 }
 
 /** Calls that only wait (device, console, observer): they skip the queue. */
-const WAIT_CALLS = new Set(['device.sleep', 'console.wait', 'console.capture', 'rta.observe', 'rce.start', 'rce.stop']);
+const WAIT_CALLS = new Set(['device.sleep', 'console.wait', 'console.capture', 'console.captureStart', 'rta.observe', 'rce.start', 'rce.stop']);
 
 /** One queue for every roku_run in this server: parallel runs cannot add up CPU-heavy calls. */
 const slots: { inFlight: number; queue: Array<{ owner: Dispatcher; resolve: () => void }> } = { inFlight: 0, queue: [] };
@@ -122,35 +124,36 @@ class Dispatcher {
   /** Set when the run's result is decided: its queued calls are dropped, not started. */
   closed = false;
 
-  /** This run's calls holding a server-wide slot; released when the run ends. */
-  private held = 0;
-
   /** Runs dispatch through the server-wide queue (at most RUN_LIMITS.maxInFlight calls at once). */
   async enqueue(name: unknown, args: unknown): Promise<unknown> {
     // Waits use no CPU and may last minutes: they must not hold a slot other runs need.
     if (typeof name === 'string' && WAIT_CALLS.has(name)) return this.dispatch(name, args);
     while (slots.inFlight >= RUN_LIMITS.maxInFlight && !this.closed) await new Promise<void>((resolve) => slots.queue.push({ owner: this, resolve }));
     if (this.closed) throw new RokuError('run_ended', 'The run ended before this call started.');
+    // The slot is freed when the call really finishes, even after its run ended (a script that
+    // returns without awaiting must not get fresh slots), or after RUN_LIMITS.maxSlotMs at most,
+    // so one hung call cannot block every later run.
     slots.inFlight++;
-    this.held++;
+    let held = true;
+    const release = () => {
+      if (!held) return;
+      held = false;
+      slots.inFlight--;
+      // Wake one waiter per freed slot, after an event-loop turn so a run's timeout can fire.
+      setImmediate(() => slots.queue.shift()?.resolve());
+    };
+    const cap = setTimeout(release, RUN_LIMITS.maxSlotMs);
+    cap.unref();
     try {
       return await this.dispatch(name, args);
     } finally {
-      if (this.held > 0) {
-        this.held--;
-        slots.inFlight--;
-      }
-      // Yield to the event loop between calls, so a run's timeout timer can fire.
-      setImmediate(() => slots.queue.shift()?.resolve());
+      clearTimeout(cap);
+      release();
     }
   }
 
   close(): void {
     this.closed = true;
-    // A call still running after the run ended (it cannot be cancelled) stops counting against other runs.
-    slots.inFlight -= this.held;
-    this.held = 0;
-    setImmediate(() => slots.queue.shift()?.resolve());
     for (let i = slots.queue.length - 1; i >= 0; i--) {
       if (slots.queue[i].owner === this) slots.queue.splice(i, 1)[0].resolve();
     }
