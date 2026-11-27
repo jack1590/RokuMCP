@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { RceError, type RceDevice, type RceInstance } from 'roku-rce';
 import { discoverFirstHost } from './discovery.js';
 import { rceClient, rcePassword } from './rce.js';
+import { RokuError } from './sdk/errors.js';
 
 const HOST_VARS = ['ROKU_DEVICE_HOST', 'ROKU_IP', 'ROKU_HOST', 'ROKU_DEV_TARGET'];
 const PASSWORD_VARS = ['ROKU_DEVICE_PASSWORD', 'ROKU_DEV_PASSWORD', 'ROKU_PASSWORD'];
@@ -94,7 +95,7 @@ export async function resolveTarget(params: TargetParams, options: { needPasswor
 
   if (choice.kind === 'rce') {
     if (options.needPassword && !password) {
-      throw new Error('The Cloud Device developer password is required. Pass `password` or set ROKU_RCE_PASSWORD in your .env file.');
+      throw new RokuError('password_required', 'The Cloud Device developer password is required. Pass `password` or set ROKU_RCE_PASSWORD in your .env file.');
     }
     const client = rceClient(params.password);
     const device = await client.findDevice(choice.ref);
@@ -113,12 +114,13 @@ export async function resolveTarget(params: TargetParams, options: { needPasswor
 
   const host = choice.host || (await discoverFirstHost());
   if (!host) {
-    throw new Error(
+    throw new RokuError(
+      'no_device',
       `No Roku device found. Please provide the device IP as a parameter, ${HOST_HINT}, set ROKU_RCE_DEVICE (or pass rceDevice) for a Roku Cloud Emulator device, or make sure a Roku device is powered on and connected to the same network.`
     );
   }
   if (options.needPassword && !password) {
-    throw new Error(`Roku developer password is required. Please provide the password as a parameter or ${PASSWORD_HINT}.`);
+    throw new RokuError('password_required', `Roku developer password is required. Please provide the password as a parameter or ${PASSWORD_HINT}.`);
   }
   const ecp: RokuTarget['ecp'] = async (path, o) => {
     const response = await axios.request({

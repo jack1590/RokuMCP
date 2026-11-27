@@ -3,9 +3,21 @@ import { z } from 'zod';
 import { RceError } from 'roku-rce';
 import { DESTRUCTIVE, READ_ONLY, WRITES, targetParams } from '../roku-config.js';
 import * as sdk from '../sdk/index.js';
-import { RCE_PORT_9000, RTA_SETUP_HINT, isRtaError, type RtaResponse } from '../sdk/rta.js';
+import { isRtaError, type RtaResponse } from '../sdk/rta.js';
 import { RokuError } from '../sdk/errors.js';
 import { errorText, failure, type ToolResult } from './result.js';
+
+const RTA_SETUP_HINT =
+  '\n\nThis tool talks to the roku-test-automation (RTA) On-Device Component on TCP port 9000. ' +
+  'If the connection is refused, the channel does not include RTA. To enable it, either bundle the RTA OnDeviceComponent in your channel ' +
+  'OR (when sideloading via roku-debug) set `"injectRdbOnDeviceComponent": true` in launch.json and add the marker comment ' +
+  '`\' vscode_rdb_on_device_component_entry` immediately after `screen.show()` inside `main()`. ' +
+  'A successful install logs `[RTA][INFO] OnDeviceComponent init` at channel launch.';
+
+const RCE_PORT_9000 =
+  'Port 9000 did not answer through the Roku Cloud Emulator bridge (RCE answered with a closed-port status). ' +
+  'Either the running channel does not include the RTA On-Device Component, or RCE does not bridge port 9000 ' +
+  '(RCE documents bridges for 8080, 8081, 8082, 8085, 8087, 9999 and 49152-65535). This path is unverified on RCE.';
 
 /** One error text for every edit-UI tool; RCE closed-port errors get their own explanation. */
 function rtaFailure(prefix: string, error: unknown): ToolResult {

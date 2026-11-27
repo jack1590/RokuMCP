@@ -1,0 +1,1628 @@
+[
+  {
+    "name": "roku_deploy",
+    "title": "Deploy dev channel",
+    "description": "Sideload (deploy) a Roku application to the device. Packages the files in rootDir into a zip and uploads it, which replaces the installed dev channel and cold-starts it. Works on LAN devices and on Roku Cloud Emulator devices (rceDevice).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "password": {
+          "description": "Developer password. Defaults to ROKU_RCE_PASSWORD for a Cloud Device, and to ROKU_DEVICE_PASSWORD (or its aliases) otherwise.",
+          "type": "string"
+        },
+        "rootDir": {
+          "type": "string",
+          "description": "Absolute path to the project root directory containing the manifest file"
+        },
+        "files": {
+          "description": "Glob patterns for files to include. Defaults to all files in rootDir (**/*).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "stagingDir": {
+          "description": "Scratch folder roku-deploy empties, fills and deletes. Defaults to a unique temp folder; must not be rootDir, inside it, or contain it.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rootDir"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_delete_dev_channel",
+    "title": "Delete dev channel",
+    "description": "Delete the currently sideloaded developer channel from the Roku device (LAN or Roku Cloud Emulator).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "password": {
+          "description": "Developer password. Defaults to ROKU_RCE_PASSWORD for a Cloud Device, and to ROKU_DEVICE_PASSWORD (or its aliases) otherwise.",
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_discover",
+    "title": "Discover LAN devices",
+    "description": "Scan the local network for Roku devices using SSDP discovery. Returns a list of all found devices with their IP addresses. LAN only: for Roku Cloud Emulator devices use roku_rce_list_devices.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "timeoutMs": {
+          "default": 3000,
+          "description": "How long to scan in milliseconds (default 3000)",
+          "type": "number"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_keypress",
+    "title": "Press key",
+    "description": "Send a single key press to the Roku device (via ECP on a LAN device, via the Instance API on a Roku Cloud Emulator device). Common keys: Home, Rev, Fwd, Play, Select, Left, Right, Down, Up, Back, InstantReplay, Info, Backspace, Search, Enter, Lit_<character>",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "key": {
+          "type": "string",
+          "description": "The key to press (e.g. Home, Select, Up, Down, Left, Right, Back, Lit_a)"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_keypress_sequence",
+    "title": "Press key sequence",
+    "description": "Send a sequence of key presses to the Roku device with an optional delay between each press.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of keys to press in order"
+        },
+        "delayMs": {
+          "default": 100,
+          "description": "Delay in milliseconds between each key press (default 100)",
+          "type": "number"
+        }
+      },
+      "required": [
+        "keys"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_launch",
+    "title": "Launch channel",
+    "description": "Launch or deep-link into a channel on the Roku device. Use appId \"dev\" for the sideloaded developer channel.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "appId": {
+          "type": "string",
+          "description": "Application ID to launch (use \"dev\" for the sideloaded channel)"
+        },
+        "params": {
+          "description": "Optional launch parameters for deep linking (key-value pairs)",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "restart": {
+          "default": false,
+          "description": "Exit the app first (ECP exit-app, falling back to Home) and wait ~1.5s. Channels with sdk_instant_resume only suspend on exit and will resume, not cold-start; use roku_deploy for a guaranteed cold start",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "appId"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_query_device_info",
+    "title": "Query device info",
+    "description": "Query the Roku device for its info: model, firmware version, serial number, network info, etc.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_query_active_app",
+    "title": "Query active app",
+    "description": "Query the currently active (foreground) app on the Roku device.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_query_app_ui",
+    "title": "Query app UI tree",
+    "description": "Get the current app UI tree as XML. Only works when a sideloaded dev channel is running. On a Roku Cloud Emulator device in the default \"Limited\" ECP mode this query is refused (403); the error explains how to switch the device to Permissive.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_query_sg_nodes",
+    "title": "Query SceneGraph nodes",
+    "description": "Query SceneGraph nodes on the Roku device. Use type \"all\" for all nodes, \"roots\" for root nodes, or \"node\" with a nodeId to inspect a specific node. On a Roku Cloud Emulator device in the default \"Limited\" ECP mode this query is refused (403); the error explains how to switch the device to Permissive.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "all",
+            "roots",
+            "node"
+          ],
+          "description": "Type of query: \"all\", \"roots\", or \"node\""
+        },
+        "nodeId": {
+          "description": "Node ID to inspect (required when type is \"node\")",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_type_text",
+    "title": "Type text",
+    "description": "Type a text string into the currently focused text field on the Roku device. Each character is sent as an individual Lit_ keypress. Use this for search fields, email inputs, password fields, etc. The result reports only the number of characters typed, never the text.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "text": {
+          "type": "string",
+          "description": "The text string to type"
+        },
+        "delayMs": {
+          "default": 50,
+          "description": "Delay in milliseconds between each character (default 50)",
+          "type": "number"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_query_media_player",
+    "title": "Query media player",
+    "description": "Query the media player state on the Roku device. Returns playback state (play, pause, buffer, stop, none), position, duration, and error info. Use this to verify video playback in tests. On a Roku Cloud Emulator device in the default \"Limited\" ECP mode this query is refused (403); the error explains how to switch the device to Permissive.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_find_node",
+    "title": "Find UI node",
+    "description": "Search the app UI tree for a node. nodeId matches a node whose id or name attribute equals the value; alternatively pass attr and value to match any attribute. Returns the matching node with all its properties (text, visible, focused, subtype, bounds, etc.). Only works when a sideloaded dev channel is running. On a Roku Cloud Emulator device in the default \"Limited\" ECP mode this query is refused (403); the error explains how to switch the device to Permissive.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "nodeId": {
+          "description": "Matches the node id or name attribute (e.g. \"emailBox\", \"settingsTabs\")",
+          "type": "string"
+        },
+        "attr": {
+          "description": "Attribute name to search by (e.g. \"subtype\", \"text\", \"name\")",
+          "type": "string"
+        },
+        "value": {
+          "description": "Attribute value to match (e.g. \"AccountSettingsScreen\")",
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_get_focused_node",
+    "title": "Get focused node",
+    "description": "Get the currently focused node in the app UI tree. Returns the node with all its properties (id, subtype, text, bounds, etc.). Only works when a sideloaded dev channel is running. On a Roku Cloud Emulator device in the default \"Limited\" ECP mode this query is refused (403); the error explains how to switch the device to Permissive.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_sleep",
+    "title": "Sleep",
+    "description": "Wait for a specified duration. Use this between navigation steps to allow the UI to render, animations to complete, or content to load. The duration is clamped to 0..30000 ms.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "durationMs": {
+          "type": "number",
+          "description": "Duration to wait in milliseconds (e.g. 1000 for 1 second, 5000 for 5 seconds)"
+        }
+      },
+      "required": [
+        "durationMs"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_screenshot",
+    "title": "Take screenshot",
+    "description": "Capture a screenshot of the current screen on the Roku device. A sideloaded dev channel must be running. Returns the image as base64-encoded content and the file path where it was saved.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "password": {
+          "description": "Developer password. Defaults to ROKU_RCE_PASSWORD for a Cloud Device, and to ROKU_DEVICE_PASSWORD (or its aliases) otherwise.",
+          "type": "string"
+        },
+        "outDir": {
+          "description": "Directory to save the screenshot. Defaults to OS temp directory.",
+          "type": "string"
+        },
+        "outFile": {
+          "description": "Base filename (without extension). Defaults to timestamped name.",
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_console_connect",
+    "title": "Connect debug console",
+    "description": "Open a connection to the BrightScript debug console on port 8085 (a WebSocket bridge on a Roku Cloud Emulator device) for ONE follow-up call: the next roku_console_read or roku_console_send closes it. To stream the console or wait for a log line, use roku_console_capture_start and roku_console_wait instead.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "port": {
+          "default": 8085,
+          "description": "Debug console port (default 8085)",
+          "type": "number"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_console_read",
+    "title": "Read debug console",
+    "description": "Read the output buffered since roku_console_connect, then close the connection (single-shot: call roku_console_connect again before the next read). For streaming, use roku_console_capture_start and roku_console_wait.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_console_send",
+    "title": "Send console command",
+    "description": "Send one command to the BrightScript debug console opened by roku_console_connect, return the output received within 500 ms, then close the connection (single-shot). Common commands: bt (backtrace), var (variables), cont (continue), step, over, out, exit, print <expr>.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "Command to send to the debug console"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_console_disconnect",
+    "title": "Disconnect debug console",
+    "description": "Close the active BrightScript debug console connection.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_console_capture_start",
+    "title": "Start console capture",
+    "description": "Start recording the BrightScript debug console (port 8085) to a file, keeping the connection open until roku_console_capture_stop. Output from before the capture (the console replays the previous session on connect) is skipped. Console text is never returned; use roku_console_wait to detect lines. Port 8085 accepts a single client: detach the VS Code BrightScript debugger first. On a Roku Cloud Emulator device the console is reached through an RCE WebSocket bridge.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "file": {
+          "description": "Absolute or cwd-relative log path. Defaults to ./logs/<YYYY-MM-DDTHH∶MM∶SS>-rokuDevice.log",
+          "type": "string"
+        },
+        "append": {
+          "default": false,
+          "description": "Append to the file instead of truncating it",
+          "type": "boolean"
+        },
+        "settleMs": {
+          "default": 2000,
+          "description": "Discard console output received during this window after connecting (replay of the previous session)",
+          "type": "number"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_console_wait",
+    "title": "Wait for console line",
+    "description": "Wait until a console line matching a regex appears in the active capture (see roku_console_capture_start). Returns line number, timestamp and a short redacted preview; the full line is in the capture file. Resolves early with reason \"waiting_for_debugger\" if the channel is blocked waiting for the VS Code debugger (redeploy it with roku_deploy).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "description": "JavaScript regular expression tested against each console line"
+        },
+        "timeoutMs": {
+          "default": 120000,
+          "description": "Maximum time to wait (default 120000)",
+          "type": "number"
+        },
+        "predicate": {
+          "description": "jwtValid: only accept lines whose \"Authorization: Bearer <jwt>\" has a future exp",
+          "type": "string",
+          "enum": [
+            "jwtValid"
+          ]
+        },
+        "sinceCaptureStart": {
+          "default": true,
+          "description": "Also match lines already captured; false = only lines arriving after this call",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "pattern"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_console_capture_stop",
+    "title": "Stop console capture",
+    "description": "Stop the active console capture, flush and close the file. Returns file path, bytes and line count.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_console_capture_status",
+    "title": "Console capture status",
+    "description": "Report whether a console capture is active, its file, bytes and line count.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "analyze_bsprof",
+    "title": "Analyze .bsprof profile",
+    "description": "Analyze a BrightScript Profiler (.bsprof) file from a Roku device. Supports memory leak detection, CPU hot-path analysis, combined full reports, and one-page summaries. Returns structured JSON.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filePath": {
+          "type": "string",
+          "description": "Absolute path to the .bsprof file"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "memory",
+            "cpu",
+            "full",
+            "summary"
+          ],
+          "description": "Analysis mode: memory (retained bytes, leaks), cpu (self time, hot functions), full (both), summary (key metrics overview)"
+        },
+        "top": {
+          "description": "Number of entries in ranked lists (default 30)",
+          "type": "number"
+        },
+        "sortBy": {
+          "description": "Sort field: retained, allocated, allocCount, cpuSelf, wallSelf, callCount",
+          "type": "string"
+        },
+        "filterModule": {
+          "description": "Filter results to a specific module/thread",
+          "type": "string"
+        },
+        "excludeModule": {
+          "description": "Exclude a module (e.g. roku_ads_lib)",
+          "type": "string"
+        },
+        "filterFile": {
+          "description": "Glob pattern for file filtering",
+          "type": "string"
+        },
+        "threshold": {
+          "description": "Only show entries exceeding this value (bytes for memory, microseconds for CPU)",
+          "type": "number"
+        }
+      },
+      "required": [
+        "filePath",
+        "mode"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "compare_bsprof",
+    "title": "Compare .bsprof profiles",
+    "description": "Compare two BrightScript Profiler (.bsprof) files to detect regressions, improvements, new memory leaks, resolved leaks, and CPU time deltas between runs.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "beforePath": {
+          "type": "string",
+          "description": "Absolute path to the \"before\" .bsprof file"
+        },
+        "afterPath": {
+          "type": "string",
+          "description": "Absolute path to the \"after\" .bsprof file"
+        },
+        "top": {
+          "description": "Number of entries in ranked lists (default 30)",
+          "type": "number"
+        },
+        "filterModule": {
+          "description": "Filter results to a specific module/thread",
+          "type": "string"
+        },
+        "excludeModule": {
+          "description": "Exclude a module (e.g. roku_ads_lib)",
+          "type": "string"
+        },
+        "threshold": {
+          "description": "Only show deltas exceeding this value (bytes or microseconds)",
+          "type": "number"
+        }
+      },
+      "required": [
+        "beforePath",
+        "afterPath"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "bsprof_info",
+    "title": "Read .bsprof header",
+    "description": "Get header metadata from a .bsprof file without full analysis — target name, device model, firmware, format version, duration, file size, and enabled features. Reads only the header/footer, so it is instant even on multi-hundred-MB profiles.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filePath": {
+          "type": "string",
+          "description": "Absolute path to the .bsprof file"
+        }
+      },
+      "required": [
+        "filePath"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_perfetto_enable",
+    "title": "Enable Perfetto tracing",
+    "description": "Enable Perfetto tracing for a Roku channel via ECP. Tracing starts automatically on each app launch, so relaunch the channel afterwards and then call roku_perfetto_start. Requires Roku OS 15.1+ on a LAN device (not supported on Roku Cloud Emulator). There is no disable command — enabled channels are cleared on reboot.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "channelId": {
+          "default": "dev",
+          "description": "Channel ID to enable tracing for (default: \"dev\" for sideloaded apps)",
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_perfetto_start",
+    "title": "Start Perfetto recording",
+    "description": "Start recording a Perfetto trace from the Roku device. The order is strict: roku_perfetto_enable, then relaunch the channel, then roku_perfetto_start. Opens a binary WebSocket to stream trace data to a local file. Only one recording session at a time. LAN devices only (not supported on Roku Cloud Emulator).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "channelId": {
+          "default": "dev",
+          "description": "Channel ID (default: \"dev\")",
+          "type": "string"
+        },
+        "outDir": {
+          "description": "Directory to save the trace file (default: OS temp directory)",
+          "type": "string"
+        },
+        "outFile": {
+          "description": "Filename without extension (default: timestamped name)",
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_perfetto_stop",
+    "title": "Stop Perfetto recording",
+    "description": "Stop the active Perfetto trace recording. Returns the file path, size, and duration. The resulting .trace file can be opened at https://ui.perfetto.dev/ or analyzed with analyze_perfetto.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "analyze_perfetto",
+    "title": "Analyze Perfetto trace",
+    "description": "Analyze a Roku Perfetto trace file (.trace). Returns structured JSON with AI-friendly suggestion fields for each analysis area. Requires the trace_processor binary (auto-downloaded on first use). Modes: summary (full report), frame-drops, key-events, observers, rendezvous, set-fields, threads.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filePath": {
+          "type": "string",
+          "description": "Absolute path to the .trace file"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "summary",
+            "frame-drops",
+            "key-events",
+            "observers",
+            "rendezvous",
+            "set-fields",
+            "threads"
+          ],
+          "description": "Analysis mode"
+        },
+        "top": {
+          "description": "Number of entries in ranked lists (default 20)",
+          "type": "number"
+        },
+        "threshold": {
+          "description": "Only show entries exceeding this value in milliseconds",
+          "type": "number"
+        }
+      },
+      "required": [
+        "filePath",
+        "mode"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "compare_perfetto",
+    "title": "Compare Perfetto traces",
+    "description": "Compare two Roku Perfetto trace files to detect performance regressions and improvements. Returns metric deltas for frame drops, key events, observers, rendezvous, and setField calls.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "beforePath": {
+          "type": "string",
+          "description": "Absolute path to the \"before\" .trace file"
+        },
+        "afterPath": {
+          "type": "string",
+          "description": "Absolute path to the \"after\" .trace file"
+        },
+        "top": {
+          "description": "Number of entries in ranked lists (default 20)",
+          "type": "number"
+        }
+      },
+      "required": [
+        "beforePath",
+        "afterPath"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "query_perfetto",
+    "title": "Query Perfetto trace",
+    "description": "Run a raw PerfettoSQL query against a Roku Perfetto trace file. Use for custom analysis beyond the built-in modes. Common queries: SELECT * FROM slice WHERE name = 'swapBuffers' ORDER BY dur DESC; SELECT * FROM slice WHERE name = 'keyEvent' ORDER BY dur DESC;",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filePath": {
+          "type": "string",
+          "description": "Absolute path to the .trace file"
+        },
+        "sql": {
+          "type": "string",
+          "description": "PerfettoSQL query to execute"
+        }
+      },
+      "required": [
+        "filePath",
+        "sql"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_edit_node",
+    "title": "Edit node fields",
+    "description": "Edit a SceneGraph node on the running dev channel at runtime by setting one or more fields. Uses the roku-test-automation (RTA) On-Device Component on TCP port 9000 — the same backend the SceneGraph Inspector in the vscode-brightscript-language extension uses. Requires RTA to be present in the running channel (see README \"Runtime UI Editing\"). nodeId can be either a `uiElementId` like \"RTA_1773\" (as shown by roku_query_sg_nodes) or a BrightScript scene-level `id`. Common fields: visible (boolean), translation ([x,y]), text (string), color (hex like \"0xRRGGBBAA\"), opacity (number 0..1). Address nodes by their uiElementId (RTA_<digits>) from roku_query_app_ui; a name attribute is not addressable and returns OK while changing nothing. Verify every change with roku_get_value: OK alone is not proof. On a Roku Cloud Emulator device port 9000 is reached through an RCE bridge, which is unverified.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string",
+          "description": "uiElementId (e.g. \"RTA_1773\") or BrightScript scene id of the node to edit"
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
+            ]
+          },
+          "description": "Map of field name -> new value. Each field becomes one setValue request."
+        }
+      },
+      "required": [
+        "nodeId",
+        "fields"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_set_node_visible",
+    "title": "Set node visibility",
+    "description": "Show or hide a SceneGraph node by id via RTA setValue on the `visible` field. Address nodes by their uiElementId (RTA_<digits>) from roku_query_app_ui; a name attribute is not addressable and returns OK while changing nothing. Verify every change with roku_get_value: OK alone is not proof. On a Roku Cloud Emulator device port 9000 is reached through an RCE bridge, which is unverified.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string",
+          "description": "uiElementId (e.g. \"RTA_1773\") or BrightScript scene id of the node"
+        },
+        "visible": {
+          "type": "boolean",
+          "description": "true to show, false to hide"
+        }
+      },
+      "required": [
+        "nodeId",
+        "visible"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_move_node",
+    "title": "Move node",
+    "description": "Move a SceneGraph node to a new position by setting its `translation` field to [x, y]. Address nodes by their uiElementId (RTA_<digits>) from roku_query_app_ui; a name attribute is not addressable and returns OK while changing nothing. Verify every change with roku_get_value: OK alone is not proof. On a Roku Cloud Emulator device port 9000 is reached through an RCE bridge, which is unverified.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string",
+          "description": "uiElementId or scene id of the node to move"
+        },
+        "x": {
+          "type": "number",
+          "description": "Target x coordinate in pixels"
+        },
+        "y": {
+          "type": "number",
+          "description": "Target y coordinate in pixels"
+        }
+      },
+      "required": [
+        "nodeId",
+        "x",
+        "y"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_focus_node",
+    "title": "Focus node",
+    "description": "Set focus on a SceneGraph node by id via RTA focusNode. Address nodes by their uiElementId (RTA_<digits>) from roku_query_app_ui; a name attribute is not addressable and returns OK while changing nothing. Verify every change with roku_get_value: OK alone is not proof. On a Roku Cloud Emulator device port 9000 is reached through an RCE bridge, which is unverified.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string",
+          "description": "uiElementId or scene id of the node to focus"
+        },
+        "on": {
+          "description": "true to set focus (default), false to remove",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "nodeId"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_remove_node",
+    "title": "Remove node",
+    "description": "Remove a SceneGraph node from its parent at runtime via RTA removeNode. Address nodes by their uiElementId (RTA_<digits>) from roku_query_app_ui; a name attribute is not addressable and returns OK while changing nothing. Verify every change with roku_get_value: OK alone is not proof. On a Roku Cloud Emulator device port 9000 is reached through an RCE bridge, which is unverified.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string",
+          "description": "uiElementId or scene id of the node to remove"
+        }
+      },
+      "required": [
+        "nodeId"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_create_node",
+    "title": "Create node",
+    "description": "Create a new SceneGraph node at runtime and append it as a child of an existing node via RTA createChild. Subtype must be a SceneGraph node type registered for the running scene (e.g. Label, Rectangle, Poster, Group). Address nodes by their uiElementId (RTA_<digits>) from roku_query_app_ui; a name attribute is not addressable and returns OK while changing nothing. Verify every change with roku_get_value: OK alone is not proof. On a Roku Cloud Emulator device port 9000 is reached through an RCE bridge, which is unverified.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "parentId": {
+          "type": "string",
+          "description": "uiElementId or scene id of the parent node"
+        },
+        "subtype": {
+          "type": "string",
+          "description": "SceneGraph subtype to create (Label, Rectangle, Poster, Group, ...)"
+        },
+        "id": {
+          "description": "Optional id to set on the new node",
+          "type": "string"
+        },
+        "fields": {
+          "description": "Optional initial fields to set on the new node",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "parentId",
+        "subtype"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_get_value",
+    "title": "Get node field value",
+    "description": "Read a field value from a SceneGraph node at runtime via RTA getValue. Returns the value as JSON. Pass either nodeId+field, or a full keyPath like \"MainScene.rowList.0.title\". Address nodes by their uiElementId (RTA_<digits>) from roku_query_app_ui; a name attribute is not addressable and returns OK while changing nothing. Verify every change with roku_get_value: OK alone is not proof. On a Roku Cloud Emulator device port 9000 is reached through an RCE bridge, which is unverified.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "nodeId": {
+          "description": "uiElementId or scene id of the node (combined with `field`)",
+          "type": "string"
+        },
+        "field": {
+          "description": "Field name on the node (used with nodeId)",
+          "type": "string"
+        },
+        "keyPath": {
+          "description": "Full RTA keyPath instead of nodeId+field (e.g. \"MainScene.rowList.focusedRow.title.text\")",
+          "type": "string"
+        },
+        "base": {
+          "description": "RTA base (default inferred from nodeId, or \"scene\" when using keyPath)",
+          "type": "string",
+          "enum": [
+            "global",
+            "scene",
+            "elementId",
+            "focusedNode",
+            "nodeRef",
+            "appUI"
+          ]
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_observe_field",
+    "title": "Observe node field",
+    "description": "Wait for a SceneGraph field to change (or match a specific value) via RTA onFieldChangeOnce. Returns when the observer fires or the timeout elapses. Great for \"wait until video starts playing\" style assertions. Address nodes by their uiElementId (RTA_<digits>) from roku_query_app_ui; a name attribute is not addressable and returns OK while changing nothing. Verify every change with roku_get_value: OK alone is not proof. On a Roku Cloud Emulator device port 9000 is reached through an RCE bridge, which is unverified.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "nodeId": {
+          "description": "uiElementId or scene id of the node",
+          "type": "string"
+        },
+        "keyPath": {
+          "description": "Full RTA keyPath (alternative to nodeId+field)",
+          "type": "string"
+        },
+        "field": {
+          "description": "Field name to observe (used with nodeId)",
+          "type": "string"
+        },
+        "match": {
+          "description": "Optional value to wait for. If omitted, fires on any change.",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "timeoutMs": {
+          "default": 10000,
+          "description": "How long to wait before giving up (default 10000)",
+          "type": "number"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_diagnose_stream",
+    "title": "Diagnose stream",
+    "description": "Diagnose why an HLS/DASH stream fails on Roku specifically by correlating the evidence you already have. Provide any combination of: the Video node error the device reported (errorInfo, as JSON or pasted log text), the manifest (a url to fetch, or pasted m3u8/mpd content), and a Charles/HAR HTTP capture file. The tool cross-references them into ranked root-cause findings (e.g. \"errorCode -6 DRM + a 403 license POST = license server rejected the Roku request\"). No Roku device is required for this. Optionally set captureLive=true to deploy a bundled StreamProbe harness (replacing the installed dev channel) and capture the device error first when you do not have errorInfo yet; host and password fall back to ROKU_DEVICE_HOST / ROKU_DEVICE_PASSWORD (or their aliases) and SSDP discovery. captureLive is not supported on Roku Cloud Emulator devices.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "errorInfo": {
+          "description": "The Video-node error the device reported. Accepts JSON (e.g. {\"errorCode\":-6,\"errorInfo\":{\"category\":\"drm\",\"drmerrcode\":13}}) or loose pasted log text.",
+          "type": "string"
+        },
+        "url": {
+          "description": "URL of the HLS (.m3u8) or DASH (.mpd) manifest to fetch and analyze.",
+          "type": "string"
+        },
+        "content": {
+          "description": "Raw manifest text (m3u8 or mpd) pasted directly, when the URL is not fetchable (auth/token-gated).",
+          "type": "string"
+        },
+        "format": {
+          "description": "Force the manifest format. Auto-detected from content/URL when omitted.",
+          "type": "string",
+          "enum": [
+            "hls",
+            "dash"
+          ]
+        },
+        "charlesSessionPath": {
+          "description": "Path to a Charles \".chlsj\" (JSON Session File) or \".har\" capture on disk. Binary \".chls\" is not supported.",
+          "type": "string"
+        },
+        "drm": {
+          "description": "The DRM configuration you used (helps the live capture and DRM correlation).",
+          "type": "object",
+          "properties": {
+            "keySystem": {
+              "description": "e.g. \"Widevine\" or \"PlayReady\"",
+              "type": "string"
+            },
+            "licenseServerUrl": {
+              "type": "string"
+            },
+            "licenseHeaders": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "captureLive": {
+          "default": false,
+          "description": "When true and no errorInfo is provided, deploy the bundled StreamProbe harness to a LAN device, play the stream, and capture the error. Requires a fetchable url; host and password fall back to the environment.",
+          "type": "boolean"
+        },
+        "host": {
+          "description": "IP address or hostname of a Roku device on the LAN. Takes precedence over rceDevice and ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "rceDevice": {
+          "description": "Roku Cloud Emulator Cloud Device id or exact name (defaults to ROKU_RCE_DEVICE). The device must have a running Run (see roku_rce_start).",
+          "type": "string"
+        },
+        "password": {
+          "description": "Developer password. Defaults to ROKU_RCE_PASSWORD for a Cloud Device, and to ROKU_DEVICE_PASSWORD (or its aliases) otherwise.",
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_rce_list_devices",
+    "title": "List RCE Cloud Devices",
+    "description": "List the Roku Cloud Emulator (RCE) Cloud Devices of the account behind ROKU_RCE_TOKEN, with their status and any current Run (its cost so far and auto-stop time). Listing is free. Billing: a Roku Cloud Emulator Run costs $0.20 per hour, billed per minute from the start request. RCE never stops an idle Run (only the max runtime cap ends it), so always call roku_rce_stop when you are done.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_rce_start",
+    "title": "Start RCE Run (billed)",
+    "description": "Start a Run on a Roku Cloud Emulator Cloud Device and wait until it takes input (about 35-50 seconds). THIS COSTS MONEY. The call can block for up to about 5 minutes (up to 60 s for RCE to show the Run, then up to 240 s for it to take input), so the client tool timeout must be longer than that. Billing: a Roku Cloud Emulator Run costs $0.20 per hour, billed per minute from the start request. RCE never stops an idle Run (only the max runtime cap ends it), so always call roku_rce_stop when you are done. Refuses a Cloud Device that already has a Run. After it returns, pass rceDevice (or set ROKU_RCE_DEVICE) to the usual roku_* tools.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "rceDevice": {
+          "description": "Cloud Device id or exact name. Defaults to ROKU_RCE_DEVICE.",
+          "type": "string"
+        },
+        "snapshotId": {
+          "description": "Snapshot to boot (see roku_rce_status). Defaults to the device's live Snapshot.",
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "maxRuntimeMinutes": {
+          "default": 60,
+          "description": "RCE ends the Run on its own after this many minutes (default 60, at most 240). This cap is the only automatic stop.",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 240
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_rce_stop",
+    "title": "Stop RCE Run",
+    "description": "Stop the current Run of a Roku Cloud Emulator Cloud Device and wait until it reports shutdown. This ends billing for that Run. It stops the Run even when another person or client started it, which ends their session (the result says whether this server started it). Only the Run current when this tool reads the device is stopped; a Run started in between is left alone. Billing: a Roku Cloud Emulator Run costs $0.20 per hour, billed per minute from the start request. RCE never stops an idle Run (only the max runtime cap ends it), so always call roku_rce_stop when you are done.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "rceDevice": {
+          "description": "Cloud Device id or exact name. Defaults to ROKU_RCE_DEVICE.",
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "roku_rce_status",
+    "title": "RCE Cloud Device status",
+    "description": "Show a Roku Cloud Emulator Cloud Device: Run state, cost so far, auto-stop time, whether this server started the Run, and its Snapshots. Free to call. Billing: a Roku Cloud Emulator Run costs $0.20 per hour, billed per minute from the start request. RCE never stops an idle Run (only the max runtime cap ends it), so always call roku_rce_stop when you are done.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "rceDevice": {
+          "description": "Cloud Device id or exact name. Defaults to ROKU_RCE_DEVICE.",
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  }
+]

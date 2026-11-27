@@ -1428,13 +1428,13 @@
     "tool": "roku_deploy",
     "args": {
       "rceDevice": "400",
-      "rootDir": "<repo>/sampleApp"
+      "rootDir": "<work>/app"
     },
     "result": {
       "content": [
         {
           "type": "text",
-          "text": "Successfully deployed app from <repo>/sampleApp to Cloud Device 400 (Parity_1)"
+          "text": "Successfully deployed app from <work>/app to Cloud Device 400 (Parity_1)"
         }
       ]
     },
@@ -1447,7 +1447,7 @@
     "tool": "roku_deploy",
     "args": {
       "rceDevice": "Parity_3",
-      "rootDir": "<repo>/sampleApp",
+      "rootDir": "<work>/app",
       "files": [
         "manifest",
         "source/**/*"
@@ -1457,7 +1457,7 @@
       "content": [
         {
           "type": "text",
-          "text": "Successfully deployed app from <repo>/sampleApp to Cloud Device 402 (Parity_3) (the device reported the package as identical to the installed one)"
+          "text": "Successfully deployed app from <work>/app to Cloud Device 402 (Parity_3) (the device reported the package as identical to the installed one)"
         }
       ]
     },
@@ -1470,8 +1470,8 @@
     "tool": "roku_deploy",
     "args": {
       "rceDevice": "400",
-      "rootDir": "<repo>/sampleApp",
-      "stagingDir": "<repo>/sampleApp/stage"
+      "rootDir": "<work>/app",
+      "stagingDir": "<work>/app/stage"
     },
     "result": {
       "content": [
@@ -1489,8 +1489,8 @@
     "tool": "roku_deploy",
     "args": {
       "rceDevice": "400",
-      "rootDir": "<repo>/sampleApp",
-      "stagingDir": "<repo>"
+      "rootDir": "<work>/app",
+      "stagingDir": "<work>"
     },
     "result": {
       "content": [
@@ -1508,7 +1508,7 @@
     "tool": "roku_deploy",
     "args": {
       "host": "127.0.0.1",
-      "rootDir": "<repo>/sampleApp",
+      "rootDir": "<work>/app",
       "stagingDir": "<work>/stage"
     },
     "result": {
@@ -1527,7 +1527,7 @@
     "tool": "roku_deploy",
     "args": {
       "host": "127.0.0.1",
-      "rootDir": "<repo>/sampleApp"
+      "rootDir": "<work>/app"
     },
     "result": {
       "content": [
@@ -1545,7 +1545,7 @@
     "tool": "roku_deploy",
     "args": {
       "rceDevice": "400",
-      "rootDir": "<repo>/sampleApp"
+      "rootDir": "<work>/app"
     },
     "result": {
       "content": [
@@ -1563,14 +1563,14 @@
     "tool": "roku_deploy",
     "args": {
       "rceDevice": "400",
-      "rootDir": "<repo>/sampleApp",
+      "rootDir": "<work>/app",
       "password": "param"
     },
     "result": {
       "content": [
         {
           "type": "text",
-          "text": "Successfully deployed app from <repo>/sampleApp to Cloud Device 400 (Parity_1)"
+          "text": "Successfully deployed app from <work>/app to Cloud Device 400 (Parity_1)"
         }
       ]
     },

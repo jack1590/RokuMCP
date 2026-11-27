@@ -22,6 +22,16 @@ test('createRoku binds the default target and returns data, not MCP text', async
     assert.equal(other.id, 401);
     assert.equal((await roku.rce.status()).id, 400);
 
+    // A per-call rceDevice replaces a default host instead of losing to it by precedence.
+    world.calls = [];
+    const lanDefault = createRoku({ host: '192.0.2.1' });
+    await lanDefault.input.keypress({ rceDevice: '400', key: 'Up' });
+    assert.deepEqual(world.calls, ['rce keypress Up']);
+    // An explicit undefined does not wipe the default.
+    world.calls = [];
+    await roku.input.keypress({ rceDevice: undefined, key: 'Down' });
+    assert.deepEqual(world.calls, ['rce keypress Down']);
+
     await assert.rejects(roku.ui.findNode({}), (e: unknown) => e instanceof RokuError && e.code === 'bad_args' && e.bare);
     world.ecpStatus['query/app-ui'] = 404;
     await assert.rejects(roku.ui.appUi(), (e: unknown) => e instanceof RokuError && e.code === 'no_dev_channel');

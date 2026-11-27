@@ -5,7 +5,7 @@ import { RokuError } from './errors.js';
 
 function deviceRef(param?: string): string {
   const ref = param || process.env.ROKU_RCE_DEVICE;
-  if (!ref) throw new Error('No Cloud Device given. Pass rceDevice (an id or exact name from roku_rce_list_devices) or set ROKU_RCE_DEVICE.');
+  if (!ref) throw new RokuError('no_cloud_device', 'No Cloud Device given. Pass rceDevice (an id or exact name from roku_rce_list_devices) or set ROKU_RCE_DEVICE.');
   return ref;
 }
 

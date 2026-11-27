@@ -1,4 +1,4 @@
-# Code mode plan (draft, not approved)
+# Code mode plan
 
 Written for: the implementer and the per-phase reviewer agents. Branch: `feat/code-mode`, from `master @ 80f87a6` (v1.9.0).
 
@@ -19,7 +19,7 @@ Cut the context an agent spends on roku-mcp. Today every session loads 46 tool d
 
 1. **Parity harness first.** Add `test/parity/`: a fake LAN device (ECP on 8060, installer on 80, console on 8085, RTA on 9000) and a fake RCE (reuse `roku-rce`'s `test/fake-rce.ts` pattern). Record the exact output of all 46 tools on `master` for a fixed set of inputs, including error paths: 404 to `query/app-ui` (`NO_DEV_CHANNEL`), timeouts, unknown `rceDevice`, Limited-mode 403, Windows-style paths in deploy. Commit the recordings as golden files before touching `src/tools`.
 2. Add `src/sdk/`, one module per area: `device` (discover, device-info, active app, launch, sleep), `input` (keypress, sequence, type text), `ui` (app-ui, sg-nodes, find-node, focused node, media player), `deploy`, `screenshot`, `console` (read, send, capture start, wait, stop, status), `rta` (edit-UI), `profiler` (bsprof), `perfetto`, `stream` (diagnose), `rce`. Each function takes typed options plus an optional target (`host` or `rceDevice`) and returns data, not MCP text. Errors are a typed `RokuError` with a `code` (e.g. `no_dev_channel`, `timeout`, `ecp_forbidden`, `not_found`).
-3. `src/sdk/index.ts` exports a `createRoku(options?)` client that holds the resolved target and the RCE client, so a script can call `roku.input.keypress('Home')`.
+3. `src/sdk/index.ts` exports a `createRoku(defaults?)` client that binds a default target to every call (resolved per call), so a script can call `roku.input.keypress({ key: 'Home' })`. A call that names its own `host` or `rceDevice` replaces the default target.
 4. Rewrite every `src/tools/*` handler as a thin wrapper: parse params, call the SDK, format the same text as before. `friendlyError` moves to the wrapper layer and maps `RokuError.code` to today's messages.
 5. Golden tests must pass unchanged. Existing 33 tests must pass.
 

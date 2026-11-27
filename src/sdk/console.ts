@@ -13,7 +13,7 @@ const MAX_KEPT_LINES = 50_000;
 const PREVIEW_CHARS = 240;
 const WAITING_FOR_DEBUGGER = /Waiting for debugger on/;
 
-export const CAPTURE_ACTIVE =
+const CAPTURE_ACTIVE =
   'A console capture is active and holds port 8085 (single client). Use roku_console_wait, or read the capture file; stop it with roku_console_capture_stop to use the single-shot console tools again.';
 const NOT_CONNECTED = 'No active console connection. Use roku_console_connect first.';
 

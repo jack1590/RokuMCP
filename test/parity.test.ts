@@ -27,7 +27,7 @@ import { buildBsprof } from './helpers/bsprof-fixture.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..', '..');
 const goldenPath = path.join(repo, 'test', 'parity', 'golden.json');
-const sampleApp = path.join(repo, 'sampleApp');
+const fixtureApp = path.join(repo, 'test', 'fixtures', 'app');
 
 const LAN = { host: '127.0.0.1' };
 const RCE = { rceDevice: '400' };
@@ -56,6 +56,7 @@ const BASE_ENV: Env = { ROKU_DEVICE_PASSWORD: 'pw', ROKU_RCE_PASSWORD: 'rpw' };
 
 function steps(work: string): Step[] {
   const s: Step[] = [];
+  const sampleApp = path.join(work, 'app');
   const add = (name: string, tool: string, args?: Record<string, unknown>, extra: Partial<Step> = {}) => s.push({ name, tool, args, ...extra });
 
   // --- ECP and input, on a LAN device and on a Cloud Device ---------------------------------
@@ -106,7 +107,7 @@ function steps(work: string): Step[] {
   add('deploy rce', 'roku_deploy', { ...RCE, rootDir: sampleApp });
   add('deploy rce identical', 'roku_deploy', { rceDevice: 'Parity_3', rootDir: sampleApp, files: ['manifest', 'source/**/*'] });
   add('deploy staging overlaps rootDir', 'roku_deploy', { ...RCE, rootDir: sampleApp, stagingDir: path.join(sampleApp, 'stage') });
-  add('deploy staging contains rootDir', 'roku_deploy', { ...RCE, rootDir: sampleApp, stagingDir: repo });
+  add('deploy staging contains rootDir', 'roku_deploy', { ...RCE, rootDir: sampleApp, stagingDir: work });
   add('deploy lan, installer closed', 'roku_deploy', { ...LAN, rootDir: sampleApp, stagingDir: path.join(work, 'stage') });
   add('deploy lan without password', 'roku_deploy', { ...LAN, rootDir: sampleApp }, { env: { ROKU_DEVICE_PASSWORD: undefined } });
   add('deploy rce without password', 'roku_deploy', { ...RCE, rootDir: sampleApp }, { env: { ROKU_DEVICE_PASSWORD: undefined, ROKU_RCE_PASSWORD: undefined } });
@@ -267,9 +268,15 @@ function normalizer(work: string) {
       .replace(/screenshot-\d+/g, 'screenshot-<ts>')
       .replace(/roku-mcp-staging-\d+/g, 'roku-mcp-staging-<ts>')
       .replace(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z/g, '<iso>')
-      .replace(/("(?:elapsedSeconds|billedMinutes|costUsd|billedMinutesAtStop|costUsdAtStop)\\?":\s*)[\d.]+/g, '$1<n>')
-      .replace(/(\\?"id\\?":\s*\\?")[a-z0-9]{6,14}(\\?")/g, '$1<rta-id>$2');
+      .replace(/("(?:elapsedSeconds|billedMinutes|costUsd|billedMinutesAtStop|costUsdAtStop)\\?":\s*)[\d.]+/g, '$1<n>');
   };
+}
+
+/** RTA request ids are random; only the get_value and observe_field results echo them. */
+const RTA_ECHO = new Set(['roku_get_value', 'roku_observe_field']);
+
+function maskRtaId(tool: string, text: string): string {
+  return RTA_ECHO.has(tool) ? text.replace(/^(\{\s*"id":\s*")[a-z0-9]+(")/, '$1<rta-id>$2') : text;
 }
 
 const ENV_KEYS = ['ROKU_DEVICE_HOST', 'ROKU_IP', 'ROKU_HOST', 'ROKU_DEV_TARGET', 'ROKU_DEVICE_PASSWORD', 'ROKU_DEV_PASSWORD', 'ROKU_PASSWORD', 'ROKU_RCE_DEVICE', 'ROKU_RCE_PASSWORD', 'ROKU_RCE_TOKEN'];
@@ -284,6 +291,7 @@ test('every tool matches the master recording', { timeout: 180_000 }, async () =
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'roku-parity-'));
   fs.mkdirSync(path.join(work, 'empty'));
   fs.writeFileSync(path.join(work, 'tiny.bsprof'), buildBsprof());
+  fs.cpSync(fixtureApp, path.join(work, 'app'), { recursive: true });
   const world = new FakeWorld();
   setRceClientFactory(() => stubRce(world));
   const lan = await startLanFakes(world);
@@ -310,6 +318,9 @@ test('every tool matches the master recording', { timeout: 180_000 }, async () =
       } catch (error) {
         result = { thrown: error instanceof Error ? error.message : String(error) };
       }
+      for (const c of (result as { content?: Array<{ text?: string }> }).content ?? []) {
+        if (typeof c.text === 'string') c.text = maskRtaId(step.tool, c.text);
+      }
       // Let late socket events (closes, bridge teardown) land in this step's call log.
       await new Promise((r) => setTimeout(r, 20));
       const extra = step.after?.();
@@ -330,4 +341,15 @@ test('every tool matches the master recording', { timeout: 180_000 }, async () =
   const golden = JSON.parse(fs.readFileSync(goldenPath, 'utf8')) as Array<{ name: string }>;
   assert.equal(records.length, golden.length, 'step count changed');
   for (let i = 0; i < golden.length; i++) assert.deepEqual(records[i], golden[i], `parity mismatch at step ${i}: ${golden[i].name}`);
+});
+
+test('tools/list matches the master recording (names, schemas, descriptions, annotations)', async () => {
+  const server: McpServer = buildServer();
+  const client = new Client({ name: 'parity', version: '0' });
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await Promise.all([server.connect(a), client.connect(b)]);
+  const { tools } = await client.listTools();
+  await client.close();
+  const listPath = path.join(repo, 'test', 'parity', 'tools-list.json');
+  assert.deepEqual(JSON.parse(JSON.stringify(tools)), JSON.parse(fs.readFileSync(listPath, 'utf8')));
 });

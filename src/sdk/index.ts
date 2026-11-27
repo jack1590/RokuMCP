@@ -41,9 +41,19 @@ export { perfettoEnable, perfettoStart, perfettoStop, analyzeTrace, compareTrace
 export { diagnoseStream } from './stream.js';
 export { listCloudDevices, cloudStatus, cloudStart, cloudStop } from './rce.js';
 
+/**
+ * The options a call runs with: undefined values are dropped, and a call that names its own
+ * host or rceDevice replaces the whole default target (password included), so host cannot win
+ * over a per-call rceDevice by precedence.
+ */
+export function withDefaults<O extends object>(defaults: TargetParams, options?: O): O {
+  const given = Object.fromEntries(Object.entries(options ?? {}).filter(([, v]) => v !== undefined)) as O & TargetParams;
+  return { ...(given.host || given.rceDevice ? {} : defaults), ...given } as O;
+}
+
 /** Binds default target options (host, rceDevice, password) to a function's options object. */
 function bind<O extends object, R>(defaults: TargetParams, fn: (options: O) => R): (options?: Partial<TargetParams> & O) => R {
-  return (options) => fn({ ...defaults, ...(options ?? {}) } as O);
+  return (options) => fn(withDefaults(defaults, options as O));
 }
 
 /**
@@ -62,8 +72,8 @@ export function createRoku(defaults: TargetParams = {}) {
       sleep: device.sleep,
     },
     input: { keypress: b(input.keypress), keySequence: b(input.keySequence), typeText: b(input.typeText) },
-    ui: { appUi: b(ui.appUi), sgNodes: b(ui.sgNodes), findNode: b(ui.findNode), focusedNode: b(ui.focusedNode) },
-    deploy: { deploy: b(deployment.deploy), deleteDevChannel: b(deployment.deleteDevChannel), screenshot: b(shots.screenshot) },
+    ui: { appUi: b(ui.appUi), sgNodes: b(ui.sgNodes), findNode: b(ui.findNode), focusedNode: b(ui.focusedNode), screenshot: b(shots.screenshot) },
+    app: { deploy: b(deployment.deploy), deleteDevChannel: b(deployment.deleteDevChannel) },
     console: {
       connect: b(consoleApi.consoleConnect),
       read: consoleApi.consoleRead,
@@ -96,9 +106,9 @@ export function createRoku(defaults: TargetParams = {}) {
     stream: { diagnose: b(stream.diagnoseStream) },
     rce: {
       list: rce.listCloudDevices,
-      status: (o: { rceDevice?: string } = {}) => rce.cloudStatus({ rceDevice: defaults.rceDevice, ...o }),
-      start: (o: rce.CloudStartOptions = {}) => rce.cloudStart({ rceDevice: defaults.rceDevice, ...o }),
-      stop: (o: { rceDevice?: string } = {}) => rce.cloudStop({ rceDevice: defaults.rceDevice, ...o }),
+      status: (o: { rceDevice?: string } = {}) => rce.cloudStatus(withDefaults({ rceDevice: defaults.rceDevice }, o)),
+      start: (o: rce.CloudStartOptions = {}) => rce.cloudStart(withDefaults({ rceDevice: defaults.rceDevice }, o)),
+      stop: (o: { rceDevice?: string } = {}) => rce.cloudStop(withDefaults({ rceDevice: defaults.rceDevice }, o)),
     },
   };
 }

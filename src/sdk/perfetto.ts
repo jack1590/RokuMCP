@@ -11,7 +11,7 @@ const PERFETTO_ALTERNATIVE =
 /** Perfetto needs direct LAN access; returns the host or throws a one-line error for Cloud Devices. */
 async function lanHost(params: TargetParams, tool: string): Promise<string> {
   const unsupported = rceUnsupported(params, tool, PERFETTO_ALTERNATIVE);
-  if (unsupported) throw new Error(unsupported);
+  if (unsupported) throw new RokuError('unsupported_target', unsupported);
   return (await resolveTarget(params)).host!;
 }
 
