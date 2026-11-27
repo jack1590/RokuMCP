@@ -253,6 +253,7 @@ export function stubRce(world: FakeWorld): RceClientLike {
         const run = { ...RUN, id: nextRunId++, created_at: new Date().toISOString() }; // RCE never reuses a Run id
         Object.assign(d, { status: 'running', running_device: run });
         started.add(run.id);
+        return { ...d } as never;
       }
       return {} as never;
     },
@@ -263,6 +264,7 @@ export function stubRce(world: FakeWorld): RceClientLike {
     waitUntilReady: async (id: number) => {
       if (world.trackRuns) {
         await new Promise((r) => setTimeout(r, world.readyDelayMs));
+        if (world.readyFails.has(id)) throw new RceError('Run did not take input within 240 s', { code: 'timeout' });
         return find(id);
       }
       if (world.readyFails.has(id)) throw new RceError('Run did not take input within 240 s', { code: 'timeout' });

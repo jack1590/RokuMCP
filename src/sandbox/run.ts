@@ -13,7 +13,6 @@ import { COMMANDS, commandShape, parseCommandInput, type Command } from '../comm
 import type { TargetParams } from '../roku-config.js';
 import { describeError, type ErrorInfo } from '../sdk/describe.js';
 import { stopScriptRun } from '../sdk/rce.js';
-import { RceError } from 'roku-rce';
 import { withDefaults } from '../sdk/defaults.js';
 import { RokuError } from '../sdk/errors.js';
 import { toPlain } from '../sdk/json.js';
@@ -160,7 +159,7 @@ class Dispatcher {
   /** This run's waits in flight (still counted after the run ends, until they finish). */
   private waits = 0;
   /** Cloud Device starts this run made that may have created a Run. */
-  private readonly rceStarts: Array<{ ref: string | undefined; requestedAt: number; runId?: number; outcome: Promise<boolean>; done: boolean }> = [];
+  private readonly rceStarts: Array<{ ref: string | undefined; runId?: number; outcome: Promise<boolean>; done: boolean }> = [];
 
   /**
    * After roku_run killed the script: stops each Cloud Device Run its starts created (in parallel,
@@ -171,9 +170,9 @@ class Dispatcher {
     const done = this.rceStarts.filter((s) => s.done);
     const pending = this.rceStarts.filter((s) => !s.done);
     const stopOne = async (s: (typeof this.rceStarts)[number]) => {
-      if (!(await s.outcome)) return '';
+      if (!(await s.outcome) || s.runId === undefined) return '';
       try {
-        const r = await stopScriptRun(s.ref, s);
+        const r = await stopScriptRun(s.ref, s.runId);
         return r.stopped ? `Stopped the Cloud Device Run it started on device ${r.deviceId}.` : '';
       } catch (error) {
         return `Could not confirm the stop of the Cloud Device Run it started (${describeError(error).message.slice(0, 200)}); check roku_rce_status.`;
@@ -284,7 +283,6 @@ class Dispatcher {
   private trackStart(command: Command, input: Record<string, unknown>): Promise<unknown> {
     const entry = {
       ref: (input.rceDevice as string | undefined) || process.env.ROKU_RCE_DEVICE,
-      requestedAt: Date.now(),
       runId: undefined as number | undefined,
       done: false,
       outcome: Promise.resolve(false),
@@ -295,13 +293,12 @@ class Dispatcher {
         entry.runId = (result as { device?: { run?: { runId?: number } | null } })?.device?.run?.runId;
         return true;
       },
-      // Started and billing: not_ready, or a failure of the start request itself that is not a
-      // 4xx refusal. Failures before the request (no device, unknown device, run_exists) started nothing.
+      // Only a start that returned its Run id can be stopped precisely: success, or not_ready
+      // (started and billing). Any other failure created no Run this server tracks.
       (e: unknown) => {
-        if (e instanceof RokuError) return e.code === 'not_ready';
-        const requested = !!(e as { startRequested?: boolean } | null)?.startRequested;
-        const refused = e instanceof RceError && (e.status ?? 0) >= 400 && (e.status ?? 0) < 500;
-        return requested && !refused;
+        if (!(e instanceof RokuError && e.code === 'not_ready')) return false;
+        entry.runId = (e as RokuError & { runId?: number }).runId;
+        return true;
       }
     );
     void entry.outcome.then(() => (entry.done = true));

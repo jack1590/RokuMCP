@@ -70,41 +70,35 @@ export async function cloudStart(options: CloudStartOptions = {}) {
     );
   }
   const minutes = options.maxRuntimeMinutes ?? 60;
-  try {
-    await core.start(device.id, { snapshotId: options.snapshotId, maxRuntime: minutes * 60 });
-  } catch (error) {
-    // The request went out: RCE may have created a Run even though the call failed.
-    if (error && typeof error === 'object') Object.assign(error, { startRequested: true });
-    throw error;
-  }
+  const shown = await core.start(device.id, { snapshotId: options.snapshotId, maxRuntime: minutes * 60 });
+  const runId = shown.running_device?.id;
   try {
     const ready = await core.waitUntilReady(device.id, { timeoutMs: 240_000 });
     return { started: true, device: deviceSummary(ready), billing: RCE_BILLING };
   } catch (error) {
-    throw new RokuError(
-      'not_ready',
-      `The Run on Cloud Device ${device.id} was started and is billing, but it did not become ready: ${friendlyError(error)}. ` +
-        'Check it with roku_rce_status, and end it with roku_rce_stop if you do not need it.',
-      { bare: true }
+    // runId lets roku_run stop exactly this Run if it kills the script.
+    throw Object.assign(
+      new RokuError(
+        'not_ready',
+        `The Run on Cloud Device ${device.id} was started and is billing, but it did not become ready: ${friendlyError(error)}. ` +
+          'Check it with roku_rce_status, and end it with roku_rce_stop if you do not need it.',
+        { bare: true }
+      ),
+      { runId }
     );
   }
 }
 
 /**
- * Cleanup after a killed roku_run script: requests a stop (no wait for shutdown) of the Run that
- * script's start created, and nothing else. With the start's runId, only that Run while it is
- * still current; without it (the start failed after the request), only a Run this server started
- * whose creation is no older than the request.
+ * Cleanup after a killed roku_run script: requests a stop (no wait for shutdown) of the Run with
+ * this id, only while it is the device's current Run and this server started it.
  */
-export async function stopScriptRun(rceDevice: string | undefined, known: { runId?: number; requestedAt: number }): Promise<{ deviceId: number; stopped: boolean; runId?: number }> {
+export async function stopScriptRun(rceDevice: string | undefined, runId: number): Promise<{ deviceId: number; stopped: boolean }> {
   const core = rceCore();
   const device = await core.findDevice(deviceRef(rceDevice));
-  const run = device.running_device;
-  if (!run || !core.startedHere(device)) return { deviceId: device.id, stopped: false };
-  const ours = known.runId !== undefined ? run.id === known.runId : Date.parse(run.created_at) >= known.requestedAt - 30_000;
-  if (!ours) return { deviceId: device.id, stopped: false };
-  await core.stop(device.id, { runId: run.id }); // refuses if that Run is no longer current
-  return { deviceId: device.id, stopped: true, runId: run.id };
+  if (device.running_device?.id !== runId || !core.startedHere(device)) return { deviceId: device.id, stopped: false };
+  await core.stop(device.id, { runId }); // refuses if that Run stopped being current meanwhile
+  return { deviceId: device.id, stopped: true };
 }
 
 /** Stops the device's current Run (even one another client started) and waits for shutdown. */

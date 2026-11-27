@@ -596,6 +596,18 @@ test('a killed script has the Cloud Device Runs it started stopped, also one sti
     const stops = world.calls.filter((c) => c.startsWith('rce stop 402'));
     assert.equal(stops.length, 1, `only A's own stop: ${stops.join(' | ')}`);
 
+    // A's start ends not_ready; A stops that Run itself, B starts 402 and keeps it, then A is killed: B's Run survives.
+    world.calls = [];
+    world.readyFails.add(402);
+    const a2 = run(`await roku.rce.start({ rceDevice: '402' }).catch(() => 0); await roku.rce.stop({ rceDevice: '402' }); await new Promise((res) => setTimeout(res, 300)); while (true) {}`, { timeoutMs: 1500 });
+    await new Promise((res) => setTimeout(res, 600));
+    world.readyFails.clear();
+    const b2 = await runSnippet({ code: `await roku.rce.start({ rceDevice: '402' }); return 'mine'`, rceDevice: '400' });
+    assert.equal(b2.result, 'mine');
+    const ra2 = await a2;
+    assert.ok(!/Stopped the Cloud Device Run/.test(ra2.error!.message), ra2.error!.message);
+    assert.equal(world.calls.filter((c) => c.startsWith('rce stop 402')).length, 1, world.calls.join(' | '));
+
     // A start that never reached RCE (no such device) is not reported as maybe billing; many such calls keep the message short.
     r = await run(`for (let i = 0; i < 300; i++) await roku.rce.start({ rceDevice: 'nope' }).catch(() => 0); while (true) {}`, { timeoutMs: 1500 });
     assert.equal(r.error?.code, 'timeout');
