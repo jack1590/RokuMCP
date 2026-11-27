@@ -18,7 +18,8 @@ const SECRET_DIR = /^(\.git|\.ssh|\.aws|\.azure|\.gnupg|\.docker|\.kube|\.config
  * File types roku_run may create: data only. A .js, .ts, .sh or similar file in roku-run/ would
  * run later outside the sandbox (test runners pick up *.test.mjs anywhere in the project).
  */
-const WRITABLE_EXT = /\.(txt|log|json|csv|tsv|md|xml|html|png|jpe?g|trace|bsprof|har|chlsj)$/i;
+// No .md or .html: CLAUDE.md, AGENTS.md and similar files are loaded as agent instructions.
+const WRITABLE_EXT = /\.(txt|log|json|csv|tsv|xml|png|jpe?g|trace|bsprof|har|chlsj)$/i;
 
 export const OUTPUT_DIR = 'roku-run';
 
@@ -94,7 +95,7 @@ export class PathPolicy {
   /** A file to create: as resolveWrite, and a data file type. */
   resolveWriteFile(p: unknown, what = 'path'): string {
     const abs = this.resolveWrite(p, what);
-    if (!WRITABLE_EXT.test(abs)) throw denied(`${what} "${p}" must be a data file (.txt, .log, .json, .csv, .md, .xml, .html, .png, .jpg, .trace, ...), not code`);
+    if (!WRITABLE_EXT.test(abs)) throw denied(`${what} "${p}" must be a data file (.txt, .log, .json, .csv, .xml, .png, .jpg, .trace, ...), not code or Markdown`);
     return abs;
   }
 

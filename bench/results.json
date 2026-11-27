@@ -1,7 +1,8 @@
 {
-  "date": "2026-11-27T05:35:54.669Z",
+  "date": "2026-11-27T05:44:04.075Z",
   "node": "v22.22.1",
   "settleMs": 100,
+  "tokenEstimate": "bytes / 4. Counts tool definitions and request/response bytes only: not model reasoning per round trip, the earlier results a model re-reads each turn, writing the snippet, roku_sdk_docs lookups, or retries.",
   "modes": {
     "full": {
       "tools": 46,
@@ -10,8 +11,8 @@
     },
     "code": {
       "tools": 3,
-      "toolsListBytes": 4208,
-      "toolsListTokens": 1052
+      "toolsListBytes": 4269,
+      "toolsListTokens": 1067
     }
   },
   "flows": [
@@ -30,7 +31,7 @@
         "requestBytes": 243,
         "responseBytes": 132,
         "contextTokens": 94,
-        "wallMs": 159,
+        "wallMs": 161,
         "errors": 0
       }
     },
@@ -49,7 +50,7 @@
         "requestBytes": 335,
         "responseBytes": 240,
         "contextTokens": 144,
-        "wallMs": 555,
+        "wallMs": 559,
         "errors": 0
       }
     },
@@ -68,7 +69,7 @@
         "requestBytes": 342,
         "responseBytes": 132,
         "contextTokens": 119,
-        "wallMs": 51,
+        "wallMs": 103,
         "errors": 0
       }
     }

@@ -33,7 +33,7 @@ const send = (message: unknown) => (process as unknown as { send(m: unknown): vo
  */
 function harden(): string | undefined {
   const p = process as unknown as Record<string, unknown>;
-  for (const k of ['kill', '_kill', '_debugProcess', '_debugEnd']) delete p[k];
+  for (const k of ['kill', '_kill', '_debugProcess', '_debugEnd', 'abort']) delete p[k];
   // Other processes' priority, and trace files written outside the grants.
   const os = process.getBuiltinModule('node:os') as Record<string, unknown>;
   os.setPriority = () => {

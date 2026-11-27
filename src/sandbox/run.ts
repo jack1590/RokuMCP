@@ -59,24 +59,22 @@ const BY_CALL = new Map<string, Command>(COMMANDS.map((c) => {
   return [`${group}.${camel(name)}`, c];
 }));
 
+/**
+ * Calls a snippet may not make. perfetto.query hands SQL to trace_processor, which runs with the
+ * server's rights; its SQLite can ATTACH any database and EXPORT_JSON overwrites any file, and no
+ * text filter closes that reliably.
+ */
+const NOT_IN_CODE_MODE: Record<string, string> = {
+  'perfetto.query':
+    'roku.perfetto.query is not available in roku_run: trace_processor runs SQL with the server\'s rights. Use roku.perfetto.analyze, or the query_perfetto tool in full mode.',
+};
+
 /** Every call name a snippet may use, for the docs tool. */
-export const CALL_NAMES = [...BY_CALL.keys(), 'fs.read', 'fs.write', 'fs.list'];
+export const CALL_NAMES = [...BY_CALL.keys(), 'fs.read', 'fs.write', 'fs.list'].filter((n) => !Object.hasOwn(NOT_IN_CODE_MODE, n));
 
 /** Options the SDK reads from (outDir and file, which it writes to, must be in the output folder). */
 const READ_KEYS = ['filePath', 'beforePath', 'afterPath', 'charlesSessionPath'];
 
-/**
- * trace_processor runs outside the sandbox with the server's rights, and its SQLite can ATTACH,
- * VACUUM INTO or call file functions. From roku_run, allow one read-only SELECT or WITH statement.
- */
-function checkReadOnlySql(sql: unknown): void {
-  const text = String(sql);
-  const bare = text.replace(/--[^\n]*|\/\*[\s\S]*?\*\//g, ' ').trim().replace(/;\s*$/, '');
-  const forbidden = /\b(attach|detach|vacuum|pragma|insert|update|delete|replace|create|drop|alter|reindex|load_extension|readfile|writefile|edit|fsdir|zipfile|sqlar)\b/i;
-  if (!/^(select|with)\b/i.test(bare) || bare.includes(';') || forbidden.test(bare)) {
-    throw new RokuError('sql_denied', 'From roku_run, perfetto.query takes one read-only SELECT or WITH statement (no ATTACH, VACUUM, PRAGMA, writes or file functions).');
-  }
-}
 /** Error codes only roku_run itself reports; a snippet cannot claim them. */
 const SANDBOX_CODES = new Set(['timeout', 'memory_limit', 'crashed', 'protocol', 'spawn_failed', 'unsupported_node', 'sandbox_unsafe', 'output_too_large']);
 const MAX_ERROR_CHARS = 2000;
@@ -119,6 +117,7 @@ class Dispatcher {
     if (typeof name !== 'string' || !Array.isArray(args)) throw new RokuError('protocol', 'Malformed call.');
     if (name.startsWith('fs.')) return this.fs(name, args);
 
+    if (Object.hasOwn(NOT_IN_CODE_MODE, name)) throw new RokuError('not_in_code_mode', NOT_IN_CODE_MODE[name]);
     const command = BY_CALL.get(name);
     if (!command) throw new RokuError('unknown_call', `roku.${name} does not exist. List the calls with roku_sdk_docs.`);
     const options = args[0] ?? {};
@@ -147,7 +146,6 @@ class Dispatcher {
     for (const key of READ_KEYS) if (input[key] !== undefined) input[key] = this.policy.resolveRead(input[key], key);
     if (input.outDir !== undefined) input.outDir = this.policy.resolveWrite(input.outDir, 'outDir');
     if (input.file !== undefined) input.file = this.policy.resolveWriteFile(input.file, 'file');
-    if (input.sql !== undefined) checkReadOnlySql(input.sql);
   }
 
   /** A capture with no file goes to the output folder, not ./logs. */
@@ -281,8 +279,9 @@ export async function runSnippet(options: RunOptions): Promise<RunResult> {
 
     child.on('exit', (code, signal) => {
       if (settled) return;
-      // V8 aborts on heap exhaustion; stderr text alone is not trusted (the snippet can write it).
-      const oom = (signal === 'SIGABRT' || code === 134) && /heap out of memory|Allocation failed/i.test(stderr);
+      // V8 aborts on heap exhaustion. The snippet cannot raise SIGABRT itself (process.abort and
+      // process.kill are removed), and an exit code or stderr text alone is not trusted.
+      const oom = signal === 'SIGABRT' && /heap out of memory|Allocation failed/i.test(stderr);
       settle({
         ok: false,
         error: oom

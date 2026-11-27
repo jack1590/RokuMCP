@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { COMMANDS, commandShape, commandSummary } from '../commands.js';
 import { DESTRUCTIVE, READ_ONLY, targetParams } from '../roku-config.js';
 import { RCE_BILLING } from '../rce.js';
-import { RUN_LIMITS, runSnippet } from '../sandbox/run.js';
+import { CALL_NAMES, RUN_LIMITS, runSnippet } from '../sandbox/run.js';
 import { ok, type ToolResult } from './result.js';
 
 const camel = (s: string) => s.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
@@ -14,21 +14,22 @@ const callName = (name: string) => {
 
 const API =
   'The snippet is the body of an async function with `roku` and `console` in scope; `return` a JSON value. ' +
-  'Every call takes one options object and returns a promise: `await roku.input.keypress({ key: "Home" })`, ' +
+  'Every call takes one options object (perfetto.query is not available here) and returns a promise: `await roku.input.keypress({ key: "Home" })`, ' +
   '`await roku.ui.find({ attr: "text", value: "Play" })`, `await roku.device.sleep({ durationMs: 1000 })`. ' +
   'Device calls default to the host or rceDevice given to roku_run, then the usual environment and discovery. ' +
-  'Files: `roku.fs.read(path)` and `roku.fs.list(path)` read inside the server\'s working directory; `roku.fs.write(path, text)` creates data files (.json, .txt, .log, .csv, .md, ...) only inside its roku-run/ folder (captures and screenshots given a folder go there too). Secret files such as .env, mcp.json and bsconfig.json are refused. ' +
+  'Files: `roku.fs.read(path)` and `roku.fs.list(path)` read inside the server\'s working directory; `roku.fs.write(path, text)` creates data files (.json, .txt, .log, .csv, .xml, ...; no code or Markdown) only inside its roku-run/ folder (captures and screenshots given a folder go there too). Secret files such as .env, mcp.json and bsconfig.json are refused. ' +
   'A failed call throws an Error with `code` and `message`; catch it to recover. Console session, capture and Perfetto recording state persists between roku_run calls. ' +
   `Limits: ${RUN_LIMITS.defaultTimeoutMs / 1000} s by default (at most ${RUN_LIMITS.maxTimeoutMs / 1000} s), ${RUN_LIMITS.memoryMb} MB, ` +
   `${RUN_LIMITS.maxResultChars / 1024} KiB return value, ${RUN_LIMITS.maxCalls} calls. The snippet has no file system, network secrets, environment or child processes of its own.`;
 
 function docsFor(query?: string) {
   const q = query?.toLowerCase().trim();
-  const matches = COMMANDS.filter((c) => !q || c.name.includes(q) || callName(c.name).toLowerCase().includes(q) || commandSummary(c).toLowerCase().includes(q));
+  const available = COMMANDS.filter((c) => CALL_NAMES.includes(callName(c.name).slice('roku.'.length)));
+  const matches = available.filter((c) => !q || c.name.includes(q) || callName(c.name).toLowerCase().includes(q) || commandSummary(c).toLowerCase().includes(q));
   if (!q) {
     return {
       api: API,
-      calls: COMMANDS.map((c) => ({ call: callName(c.name), summary: commandSummary(c).split('. ')[0].slice(0, 160) })),
+      calls: available.map((c) => ({ call: callName(c.name), summary: commandSummary(c).split('. ')[0].slice(0, 160) })),
       fs: ['roku.fs.read(path) -> string', 'roku.fs.write(path, text) -> { path, bytes } (relative paths land in roku-run/; writes go only there)', 'roku.fs.list(path?) -> [{ name, type }]'],
       next: 'Call roku_sdk_docs with a query (e.g. "keypress", "console", "rta") for full option schemas.',
     };

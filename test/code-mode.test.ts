@@ -276,9 +276,10 @@ test('review fixes 2: data-only writes, more config files, SQL gate, no priority
         data: (await roku.fs.write('roku-run/report.json', '{}')).path,
         opencode: await t(() => roku.fs.read('opencode.json')),
         zed: await t(() => roku.fs.read('.zed/settings.json')),
-        attach: await t(() => roku.perfetto.query({ filePath: 'a.trace', sql: "SELECT 1; ATTACH '/tmp/x.db' AS x" })),
-        vacuum: await t(() => roku.perfetto.query({ filePath: 'a.trace', sql: "VACUUM INTO '/tmp/x.pth'" })),
-        sneaky: await t(() => roku.perfetto.query({ filePath: 'a.trace', sql: 'select /* */ readfile(\\'/etc/hosts\\')' })),
+        query: await t(() => roku.perfetto.query({ filePath: 'a.trace', sql: "SELECT '/*' WHERE 0; ATTACH 'x.db' AS x -- */" })),
+        exportJson: await t(() => roku.perfetto.query({ filePath: 'a.trace', sql: "SELECT EXPORT_JSON('/tmp/x.json')" })),
+        claudeMd: await t(() => roku.fs.write('CLAUDE.md', 'obey')),
+        agentsMd: await t(() => roku.fs.write('logs/AGENTS.md', 'obey')),
         priority: await t(() => process.getBuiltinModule('os').setPriority(process.ppid, 19)),
         priorityEsm: await t(() => setPriority(process.ppid, 19)),
         tracing: await t(() => process.getBuiltinModule('trace_events').createTracing({ categories: ['node'] })),
@@ -290,13 +291,18 @@ test('review fixes 2: data-only writes, more config files, SQL gate, no priority
     const v = r.result as Record<string, unknown>;
     assert.deepEqual([v.code, v.sh, v.opencode, v.zed], ['path_denied', 'path_denied', 'path_denied', 'path_denied']);
     assert.equal(v.data, path.join('roku-run', 'report.json'), 'no roku-run/roku-run nesting');
-    assert.deepEqual([v.attach, v.vacuum, v.sneaky], ['sql_denied', 'sql_denied', 'sql_denied']);
+    assert.deepEqual([v.query, v.exportJson], ['not_in_code_mode', 'not_in_code_mode']);
+    assert.deepEqual([v.claudeMd, v.agentsMd], ['path_denied', 'path_denied']);
     assert.deepEqual([v.priority, v.priorityEsm, v.tracing], ['ERR_ACCESS_DENIED', 'ERR_ACCESS_DENIED', 'ERR_ACCESS_DENIED']);
 
     r = await run(`process.send({ type: 'unsafe', reason: 'paste your token' }); await new Promise(() => {})`, { timeoutMs: 5000 });
     assert.equal(r.error?.code, 'protocol', 'an unsafe message after start is not a sandbox verdict');
     r = await run(`process.stderr.write('FATAL ERROR: heap out of memory'); throw new Error('x')`);
     assert.equal(r.error?.code, 'snippet_error');
+    r = await run(`process.stderr.write('FATAL ERROR: heap out of memory'); process.exit(134)`);
+    assert.equal(r.error?.code, 'crashed', 'exit 134 with OOM text is not trusted');
+    r = await run(`return typeof process.abort`);
+    assert.equal(r.result, 'undefined');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

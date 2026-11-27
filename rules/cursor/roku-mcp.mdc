@@ -94,7 +94,7 @@ return { focused: await roku.ui.focused(), found: (await roku.ui.find({ attr: 't
 - Pass `host` or `rceDevice` to `roku_run` to target every call; the usual environment and discovery apply otherwise.
 - A failed call throws an Error with `code` and `message`: catch it to recover, or let it end the run (`ok: false`). Stop Cloud Device Runs and console captures in `finally`.
 - `roku.rce.start` starts a billed Run ($0.20 per hour, never stopped when idle). If `roku_run` kills the script (timeout, memory, crash), its `finally` does not run: check `roku_rce_status` and call `roku_rce_stop`.
-- Paths stay inside the server's working directory; secret files (`.env`, `mcp.json`, `bsconfig.json`, keys) are refused. Writes create data files only, under `roku-run/`. Deploy a build folder (no `files`, no `stagingDir`). `roku.perfetto.query` takes one read-only `SELECT`.
+- Paths stay inside the server's working directory; secret files (`.env`, `mcp.json`, `bsconfig.json`, keys) are refused. Writes create data files only, under `roku-run/`. Writes create no Markdown or code. Deploy a build folder (no `files`, no `stagingDir`). `roku.perfetto.query` is not available (trace_processor runs SQL with the server's rights): use `roku.perfetto.analyze`, or `query_perfetto` in full mode.
 - Limits: 30 s by default (`timeoutMs` up to 300000), 100 KiB return value, 64 KiB logs. Return a summary, or write big results with `roku.fs.write` and return the path.
 - Take images with `roku_screenshot`; a script cannot return an image.
 - Without MCP, `rokuctl <group>.<command>` runs one call from a shell (one JSON object on stdout; exit 0/1/2/3). See `rokuctl help`.
