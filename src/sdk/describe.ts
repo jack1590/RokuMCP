@@ -20,9 +20,15 @@ export function redactSecrets(text: string, env: NodeJS.ProcessEnv = process.env
   let out = text.replace(/(Bearer\s+)[\w.~+/=-]+/gi, '$1<redacted>').replace(/eyJ[\w-]+\.[\w-]+\.[\w-]*/g, '<jwt>');
   for (const k of SECRET_VARS) {
     const v = env[k];
-    // Whole-token matches only, so a password like "roku" does not mangle "roku_console_wait".
+    // A word-character edge must not touch another word character, so a password like "roku" does
+    // not mangle "roku_console_wait"; a symbol edge ("!abcd") still matches when glued to text.
     // shortcut: values under 4 characters are not redacted (too many false hits), upgrade if they appear.
-    if (v && v.length >= 4) out = out.replace(new RegExp(`(?<![\\w])${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`, 'g'), '<redacted>');
+    if (v && v.length >= 4) {
+      const body = v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const before = /^\w/.test(v) ? '(?<!\\w)' : '';
+      const after = /\w$/.test(v) ? '(?!\\w)' : '';
+      out = out.replace(new RegExp(before + body + after, 'g'), '<redacted>');
+    }
   }
   return out;
 }

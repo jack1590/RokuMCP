@@ -192,6 +192,9 @@ test('review fixes: error codes and console.capture misses', async () => {
     assert.equal(info.message, 'login failed for <redacted> with Bearer <redacted>');
     process.env.ROKU_RCE_PASSWORD = 'roku';
     assert.equal(describeError(new Error('roku_console_wait failed: roku')).message, 'roku_console_wait failed: <redacted>');
+    process.env.ROKU_RCE_PASSWORD = 'p@ss!';
+    assert.equal(describeError(new Error('pw xp@ss!_y')).message.includes('p@ss!'), true, 'word edge glued to a word char: kept, by design');
+    assert.equal(describeError(new Error('pw: p@ss!_y')).message, 'pw: <redacted>_y', 'symbol edge glued to text: redacted');
     assert.equal(describeError(new Error('Timed out connecting to RTA on 1.2.3.4')).code, 'timeout');
   } finally {
     delete process.env.ROKU_RCE_PASSWORD;
