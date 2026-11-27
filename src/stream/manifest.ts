@@ -76,6 +76,8 @@ export interface ManifestSource {
   url?: string;
   /** Forced format; otherwise auto-detected. */
   format?: StreamFormat;
+  /** Fetch limits (roku_run sets them): largest response body in bytes, and a timeout per request. */
+  limits?: { maxBytes: number; timeoutMs: number };
 }
 
 /**
@@ -448,13 +450,15 @@ function distinct<T>(arr: T[]): T[] {
   return [...new Set(arr)];
 }
 
+const fetchLimits = (l?: { maxBytes: number; timeoutMs: number }) => (l ? { maxContentLength: l.maxBytes, timeout: l.timeoutMs } : {});
+
 /** Fetch + parse a manifest from any of the supported sources. */
 export async function loadManifest(source: ManifestSource): Promise<ManifestSummary> {
   let content = source.content;
   const url = source.url;
 
   if (!content && url) {
-    const response = await axios.get(url, { responseType: 'text', transformResponse: [(d) => d] });
+    const response = await axios.get(url, { responseType: 'text', transformResponse: [(d) => d], ...fetchLimits(source.limits) });
     content = typeof response.data === 'string' ? response.data : String(response.data);
   }
 
@@ -475,7 +479,7 @@ export async function loadManifest(source: ManifestSource): Promise<ManifestSumm
       const childUri = firstChildPlaylistUri(content);
       if (childUri) {
         const childUrl = resolveUrl(url, childUri);
-        const resp = await axios.get(childUrl, { responseType: 'text', transformResponse: [(d) => d], timeout: 8000 });
+        const resp = await axios.get(childUrl, { responseType: 'text', transformResponse: [(d) => d], timeout: 8000, ...fetchLimits(source.limits) });
         const childText = typeof resp.data === 'string' ? resp.data : String(resp.data);
         const child = parseHls(childText);
         summary.container = child.container;

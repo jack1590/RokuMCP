@@ -26,6 +26,9 @@ export const RUN_LIMITS = {
   maxWriteBytes: 5 * 1024 * 1024,
   maxResultChars: 100 * 1024,
   maxArgChars: 1024 * 1024,
+  maxParseBytes: 5 * 1024 * 1024,
+  /** Calls running at once per run; more wait in a queue (CPU-heavy parses cannot pile up). */
+  maxInFlight: 2,
 };
 
 /** Node's permission model without the experimental flag: 22.13+ (and 23.5+). */
@@ -110,6 +113,29 @@ function childEnv(): NodeJS.ProcessEnv {
 class Dispatcher {
   calls = 0;
   readonly files = new Set<string>();
+  private inFlight = 0;
+  private readonly queue: Array<() => void> = [];
+  /** Set when the run's result is decided: queued calls are dropped, not started. */
+  closed = false;
+
+  /** Runs dispatch with at most RUN_LIMITS.maxInFlight calls at once. */
+  async enqueue(name: unknown, args: unknown): Promise<unknown> {
+    while (this.inFlight >= RUN_LIMITS.maxInFlight && !this.closed) await new Promise<void>((resolve) => this.queue.push(resolve));
+    if (this.closed) throw new RokuError('run_ended', 'The run ended before this call started.');
+    this.inFlight++;
+    try {
+      return await this.dispatch(name, args);
+    } finally {
+      this.inFlight--;
+      // Yield to the event loop between calls, so the run's timeout timer can fire.
+      setImmediate(() => this.queue.shift()?.());
+    }
+  }
+
+  close(): void {
+    this.closed = true;
+    for (const next of this.queue.splice(0)) next();
+  }
 
   constructor(private readonly policy: PathPolicy, private readonly target: TargetParams) {}
 
@@ -144,6 +170,8 @@ class Dispatcher {
     if (input.filterFile !== undefined) {
       throw new RokuError('bad_args', 'filterFile cannot be set from roku_run; use filterModule or excludeModule, or filter the report in the script.');
     }
+    // Snippet-chosen files and URLs: bounded size and time before parsing on the server.
+    if (command.name === 'stream.diagnose') input.limits = { maxBytes: RUN_LIMITS.maxParseBytes, timeoutMs: 15_000 };
     // A snippet's regex runs on the server's event loop: linear time only (no ReDoS).
     if (command.name === 'console.wait' || command.name === 'console.capture') input.linear = true;
     return toPlain(await command.run(input)).data;
@@ -246,6 +274,7 @@ export async function runSnippet(options: RunOptions): Promise<RunResult> {
     const settle = (r: Omit<RunResult, 'files' | 'calls'>) => {
       if (settled) return;
       settled = true;
+      dispatcher.close();
       clearTimeout(timer);
       if (child.exitCode === null) child.kill('SIGKILL');
       resolve({ ...r, files: [...dispatcher.files], calls: dispatcher.calls });
@@ -267,7 +296,7 @@ export async function runSnippet(options: RunOptions): Promise<RunResult> {
         child.send({ type: 'run', code: options.code });
       } else if (m?.type === 'call' && typeof m.id === 'number' && started) {
         const id = m.id;
-        dispatcher.dispatch(m.name, m.args).then(
+        dispatcher.enqueue(m.name, m.args).then(
           (value) => !settled && child.connected && child.send({ type: 'result', id, value }),
           (error) => !settled && child.connected && child.send({ type: 'result', id, error: describeError(error) })
         );

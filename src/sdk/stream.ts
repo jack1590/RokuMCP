@@ -63,6 +63,8 @@ export interface DiagnoseStreamOptions extends TargetParams {
   drm?: { keySystem?: string; licenseServerUrl?: string; licenseHeaders?: Record<string, string> };
   /** Deploy the StreamProbe harness to a LAN device and capture the error (needs url, no errorInfo). */
   captureLive?: boolean;
+  /** Size and time limits on the session file and manifest fetches (roku_run sets them; the tool does not). */
+  limits?: { maxBytes: number; timeoutMs: number };
 }
 
 /** Ranked root-cause findings plus the evidence summaries behind them. */
@@ -91,6 +93,8 @@ export async function diagnoseStream(params: DiagnoseStreamOptions) {
   let charles: CharlesSession | undefined;
   if (params.charlesSessionPath) {
     try {
+      const size = params.limits ? (await fs.stat(params.charlesSessionPath)).size : 0;
+      if (params.limits && size > params.limits.maxBytes) throw new Error(`the file is ${size} bytes; roku_run reads at most ${params.limits.maxBytes}`);
       const text = await fs.readFile(params.charlesSessionPath, 'utf-8');
       charles = parseCharlesText(text);
     } catch (e) {
@@ -116,6 +120,7 @@ export async function diagnoseStream(params: DiagnoseStreamOptions) {
         content: manifestContent,
         url: manifestUrl,
         format: params.format as StreamFormat | undefined,
+        limits: params.limits,
       });
     } catch (e) {
       reportNotes.push(`Manifest could not be loaded/parsed: ${friendlyError(e)}`);

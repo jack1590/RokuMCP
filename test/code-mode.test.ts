@@ -392,3 +392,38 @@ test('the HLS attribute parser stays linear on long attribute names', async () =
   await loadManifest({ content: '#EXTM3U\n#EXT-X-STREAM-INF:' + 'A'.repeat(200_000) + '\nv.m3u8', format: 'hls' }).catch(() => undefined);
   assert.ok(Date.now() - t < 3000, `took ${Date.now() - t} ms`);
 });
+
+test('review fixes 5: fan-out is queued, the timeout still fires, fetches and session files are bounded', { skip, timeout: 90_000 }, async () => {
+  const http = await import('node:http');
+  const big = '#EXTM3U\n' + '#EXTINF:1,\nseg.ts\n'.repeat(3_000_000);
+  const server = http.createServer((_req, res) => res.end(big));
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+  const port = (server.address() as { port: number }).port;
+  const root = workdir();
+  try {
+    let t = Date.now();
+    let r = await run(
+      `
+      const entry = { request: { method: 'GET', url: 'http://x/a.m3u8', headers: [] }, response: { status: 200, headers: [], content: { mimeType: 'text/plain', text: '#EXTM3U' } } };
+      const one = JSON.stringify(entry).length + 1;
+      const har = JSON.stringify({ log: { entries: Array(Math.floor(4.4e6 / one)).fill(entry) } });
+      await roku.fs.write('big.har', har);
+      await Promise.all(Array.from({ length: 60 }, () => roku.stream.diagnose({ charlesSessionPath: 'roku-run/big.har' }).catch(() => 0)));
+      return 'done';
+    `,
+      { root, timeoutMs: 2000 }
+    );
+    assert.equal(r.error?.code, 'timeout', JSON.stringify(r));
+    assert.ok(Date.now() - t < 8000, `fan-out returned after ${Date.now() - t} ms`);
+    assert.ok(r.calls < 60, `queued calls were dropped (${r.calls} started)`);
+
+    t = Date.now();
+    r = await run(`return (await roku.stream.diagnose({ url: 'http://127.0.0.1:${port}/big.m3u8' })).notes`, { root, timeoutMs: 30_000 });
+    assert.equal(r.ok, true, JSON.stringify(r.error));
+    assert.ok((r.result as string[]).some((n) => /Manifest could not be loaded/.test(n)), JSON.stringify(r.result));
+    assert.ok(Date.now() - t < 10_000, `big fetch took ${Date.now() - t} ms`);
+  } finally {
+    server.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
