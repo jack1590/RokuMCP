@@ -1,5 +1,6 @@
 import { RceClient } from 'roku-rce';
 import { envPassword } from './roku-config.js';
+import { RokuError } from './sdk/errors.js';
 
 /** The Core/Instance API surface roku-mcp uses; RceClient satisfies it, tests pass a stub. */
 export type RceClientLike = Pick<
@@ -16,7 +17,7 @@ const TOKEN_HINT = 'Roku Cloud Emulator needs ROKU_RCE_TOKEN (an RCE personal ac
 type Factory = (devPassword: string | undefined) => RceClientLike;
 let factory: Factory = (devPassword) => {
   const token = process.env.ROKU_RCE_TOKEN;
-  if (!token) throw new Error(TOKEN_HINT);
+  if (!token) throw new RokuError('no_token', TOKEN_HINT);
   return new RceClient({ token, devPassword });
 };
 const clients = new Map<string, RceClientLike>();

@@ -89,6 +89,13 @@ export function rceUnsupported(params: TargetParams, tool: string, alternative: 
     : undefined;
 }
 
+let discoverHost: () => Promise<string | null> = discoverFirstHost;
+
+/** Tests only: replace SSDP discovery of the default LAN host. */
+export function setHostDiscovery(fn: () => Promise<string | null>): void {
+  discoverHost = fn;
+}
+
 export async function resolveTarget(params: TargetParams, options: { needPassword?: boolean } = {}): Promise<RokuTarget> {
   const choice = pickTarget(params);
   const password = pickPassword(choice.kind, params.password);
@@ -112,7 +119,7 @@ export async function resolveTarget(params: TargetParams, options: { needPasswor
     };
   }
 
-  const host = choice.host || (await discoverFirstHost());
+  const host = choice.host || (await discoverHost());
   if (!host) {
     throw new RokuError(
       'no_device',

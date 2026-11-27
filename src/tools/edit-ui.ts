@@ -22,7 +22,8 @@ const RCE_PORT_9000 =
 /** One error text for every edit-UI tool; RCE closed-port errors get their own explanation. */
 function rtaFailure(prefix: string, error: unknown): ToolResult {
   if (error instanceof RceError && error.code === 'port_closed') return failure(`${prefix}: ${RCE_PORT_9000}`);
-  if (error instanceof RokuError) return failure(errorText(prefix, error));
+  // The tool's own argument errors are shown as written; everything else (no device too) gets the RTA hint.
+  if (error instanceof RokuError && error.bare) return failure(error.message);
   return failure(`${errorText(prefix, error)}${RTA_SETUP_HINT}`);
 }
 
