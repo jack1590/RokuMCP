@@ -1,0 +1,76 @@
+{
+  "date": "2026-11-27T05:35:54.669Z",
+  "node": "v22.22.1",
+  "settleMs": 100,
+  "modes": {
+    "full": {
+      "tools": 46,
+      "toolsListBytes": 47813,
+      "toolsListTokens": 11953
+    },
+    "code": {
+      "tools": 3,
+      "toolsListBytes": 4208,
+      "toolsListTokens": 1052
+    }
+  },
+  "flows": [
+    {
+      "name": "deploy, then verify a label",
+      "full": {
+        "calls": 3,
+        "requestBytes": 276,
+        "responseBytes": 405,
+        "contextTokens": 170,
+        "wallMs": 121,
+        "errors": 0
+      },
+      "code": {
+        "calls": 1,
+        "requestBytes": 243,
+        "responseBytes": 132,
+        "contextTokens": 94,
+        "wallMs": 159,
+        "errors": 0
+      }
+    },
+    {
+      "name": "navigate five keys, then find a node",
+      "full": {
+        "calls": 12,
+        "requestBytes": 745,
+        "responseBytes": 765,
+        "contextTokens": 378,
+        "wallMs": 513,
+        "errors": 0
+      },
+      "code": {
+        "calls": 1,
+        "requestBytes": 335,
+        "responseBytes": 240,
+        "contextTokens": 144,
+        "wallMs": 555,
+        "errors": 0
+      }
+    },
+    {
+      "name": "capture the console, wait for a line",
+      "full": {
+        "calls": 4,
+        "requestBytes": 388,
+        "responseBytes": 740,
+        "contextTokens": 282,
+        "wallMs": 53,
+        "errors": 0
+      },
+      "code": {
+        "calls": 1,
+        "requestBytes": 342,
+        "responseBytes": 132,
+        "contextTokens": 119,
+        "wallMs": 51,
+        "errors": 0
+      }
+    }
+  ]
+}

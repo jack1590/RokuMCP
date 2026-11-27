@@ -40,6 +40,7 @@
     "watch": "tsc --watch",
     "start": "node dist/index.js",
     "build:test": "tsc -p tsconfig.test.json && node -e \"const fs=require('fs');fs.copyFileSync('src/stream/roku-specs.json','dist-test/src/stream/roku-specs.json');fs.copyFileSync('package.json','dist-test/package.json')\"",
+    "bench": "npm run build:test && node scripts/bench.mjs",
     "test": "npm run build:test && node --test --test-concurrency=1 \"dist-test/test/*.test.js\"",
     "prepublishOnly": "npm test",
     "prepare": "npm run build"
