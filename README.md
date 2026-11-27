@@ -253,6 +253,7 @@ The script runs in a separate Node.js process started with the [permission model
   - **Device hosts:** `host` must be a plain address (no port or path). As with the tools, a deploy to a host the script names uses the configured password, and deploy, delete, screenshot, `perfetto.enable` and live stream capture only time out when that host goes quiet, so a host that keeps sending slowly holds the call open (each still holds a queue slot for at most 60 s).
   - **Windows:** not tested yet.
   - **Large profiles:** parsing a multi-hundred-MB `.bsprof` is synchronous and blocks the server until it finishes; the `roku_run` timeout cannot interrupt it. A script cannot set `filterFile` (minimatch backtracks on long names); use `filterModule` or filter the report in the script.
+  - **Leftover waits:** a script that starts waits without awaiting them (for example `rta.observe` with a long timeout) leaves them running after it returns, for up to 300 s. Many such runs can fill the 64 shared wait slots, and later runs' waits then queue until those end; the timeout message says when calls were waiting for a slot.
   - **Full-mode console patterns:** `roku_console_wait` in full mode uses the normal regex engine, as in 1.9.0, so a catastrophic pattern can stall the server.
 
 ## Command line (rokuctl)

@@ -151,6 +151,8 @@ class Dispatcher {
   readonly files = new Set<string>();
   /** Set when the run's result is decided: its queued calls are dropped, not started. */
   closed = false;
+  /** This run's calls waiting for a free slot. */
+  queued = 0;
   /** This run's waits in flight (still counted after the run ends, until they finish). */
   private waits = 0;
 
@@ -161,7 +163,11 @@ class Dispatcher {
     if (isWait && this.waits >= RUN_LIMITS.maxWaitsPerRun) {
       throw new RokuError('too_many_waits', `At most ${RUN_LIMITS.maxWaitsPerRun} waits (sleep, console wait, observe, Cloud Device start/stop) at once per run.`);
     }
-    while (lane.inFlight >= lane.max && !this.closed) await new Promise<void>((resolve) => lane.queue.push({ owner: this, resolve }));
+    while (lane.inFlight >= lane.max && !this.closed) {
+      this.queued++;
+      await new Promise<void>((resolve) => lane.queue.push({ owner: this, resolve }));
+      this.queued--;
+    }
     if (this.closed) throw new RokuError('run_ended', 'The run ended before this call started.');
     // The slot is freed when the call really finishes, even after its run ended (a script that
     // returns without awaiting must not get fresh slots), or after lane.holdMs at most.
@@ -345,7 +351,10 @@ export async function runSnippet(options: RunOptions): Promise<RunResult> {
       resolve({ ...r, files: [...dispatcher.files], calls: dispatcher.calls });
     };
     const timer = setTimeout(
-      () => settle({ ok: false, error: { code: 'timeout', message: `roku_run stopped the snippet after ${timeoutMs} ms. A device call already in progress may still finish; no new calls run.`, sandbox: true }, logs: [] }),
+      () => {
+        const busy = dispatcher.queued ? ` ${dispatcher.queued} of its calls were still waiting for a free slot: other runs' calls are holding them.` : '';
+        settle({ ok: false, error: { code: 'timeout', message: `roku_run stopped the snippet after ${timeoutMs} ms. A device call already in progress may still finish; no new calls run.${busy}`, sandbox: true }, logs: [] });
+      },
       timeoutMs
     );
 
