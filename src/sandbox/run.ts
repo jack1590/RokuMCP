@@ -31,8 +31,10 @@ export const RUN_LIMITS = {
   maxInFlight: 2,
   /** Longest a call holds a work slot. */
   maxSlotMs: 60_000,
-  /** Waits (sleep, console wait, observe, Cloud Device start/stop) running at once across all runs. */
-  maxWaits: 8,
+  /** Waits (sleep, console wait, observe, Cloud Device start/stop) one run may have at once. */
+  maxWaitsPerRun: 8,
+  /** ...and across all runs: waits only hold sockets, so this is high, but bounded. */
+  maxWaitsTotal: 64,
 };
 
 /** Node's permission model without the experimental flag: 22.13+ (and 23.5+). */
@@ -131,34 +133,46 @@ interface Lane {
  */
 const LANES: Record<'work' | 'wait', Lane> = {
   work: { max: RUN_LIMITS.maxInFlight, holdMs: RUN_LIMITS.maxSlotMs, inFlight: 0, queue: [] },
-  wait: { max: RUN_LIMITS.maxWaits, holdMs: RUN_LIMITS.maxTimeoutMs + 10_000, inFlight: 0, queue: [] },
+  wait: { max: RUN_LIMITS.maxWaitsTotal, holdMs: RUN_LIMITS.maxTimeoutMs + 10_000, inFlight: 0, queue: [] },
 };
 
 /** A LAN host as an address only: no port or path, so a script cannot aim a call at any service. */
-const PLAIN_HOST = /^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,62})(?:\.[A-Za-z0-9-]{1,63})*|\[[0-9A-Fa-f:.]+\]|[0-9A-Fa-f:]+:[0-9A-Fa-f:.]*)$/;
+const PLAIN_HOST = /^(?:[A-Za-z0-9][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)*|\[[0-9A-Fa-f:.]+\]|[0-9A-Fa-f:]+(?:\.[0-9.]+)?)$/;
+// The length cap comes first: it bounds the regex work on any input.
+const plainHost = (h: unknown) => typeof h === 'string' && h.length <= 255 && PLAIN_HOST.test(h);
 
 /** Wait options a script may set, capped at the longest run. */
 const WAIT_KEYS = ['timeoutMs', 'durationMs', 'settleMs'];
+/** Per-key delays in key sequences and typing. */
+const MAX_DELAY_MS = 10_000;
 
 class Dispatcher {
   calls = 0;
   readonly files = new Set<string>();
   /** Set when the run's result is decided: its queued calls are dropped, not started. */
   closed = false;
+  /** This run's waits in flight (still counted after the run ends, until they finish). */
+  private waits = 0;
 
   /** Runs dispatch in its lane (at most lane.max calls at once across all runs). */
   async enqueue(name: unknown, args: unknown): Promise<unknown> {
-    const lane = typeof name === 'string' && WAIT_CALLS.has(name) ? LANES.wait : LANES.work;
+    const isWait = typeof name === 'string' && WAIT_CALLS.has(name);
+    const lane = isWait ? LANES.wait : LANES.work;
+    if (isWait && this.waits >= RUN_LIMITS.maxWaitsPerRun) {
+      throw new RokuError('too_many_waits', `At most ${RUN_LIMITS.maxWaitsPerRun} waits (sleep, console wait, observe, Cloud Device start/stop) at once per run.`);
+    }
     while (lane.inFlight >= lane.max && !this.closed) await new Promise<void>((resolve) => lane.queue.push({ owner: this, resolve }));
     if (this.closed) throw new RokuError('run_ended', 'The run ended before this call started.');
     // The slot is freed when the call really finishes, even after its run ended (a script that
     // returns without awaiting must not get fresh slots), or after lane.holdMs at most.
     lane.inFlight++;
+    if (isWait) this.waits++;
     let held = true;
     const release = () => {
       if (!held) return;
       held = false;
       lane.inFlight--;
+      if (isWait) this.waits--;
       // Wake one waiter per freed slot, after an event-loop turn so a run's timeout can fire.
       setImmediate(() => lane.queue.shift()?.resolve());
     };
@@ -207,12 +221,13 @@ class Dispatcher {
       throw new RokuError('bad_args', `Invalid options for roku.${name}: ${issues}`);
     }
     const input = valid.data as Record<string, unknown>;
-    if (input.host !== undefined && !PLAIN_HOST.test(String(input.host))) {
+    if (input.host !== undefined && !plainHost(input.host)) {
       throw new RokuError('bad_args', 'host must be an IP address or host name, without a port or path.');
     }
     for (const key of WAIT_KEYS) {
       if (typeof input[key] === 'number') input[key] = Math.min(input[key] as number, RUN_LIMITS.maxTimeoutMs);
     }
+    if (typeof input.delayMs === 'number') input.delayMs = Math.min(input.delayMs, MAX_DELAY_MS);
     this.defaults(command, input);
     this.checkPaths(input);
     // bsprof-cli matches this glob with minimatch for every record; even plain * globs backtrack

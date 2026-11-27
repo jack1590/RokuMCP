@@ -11,6 +11,7 @@ import { RokuError } from './errors.js';
 
 const CONSOLE_PORT = 8085;
 const MAX_KEPT_LINES = 50_000;
+const MAX_KEPT_CHARS = 16 * 1024 * 1024;
 const PREVIEW_CHARS = 240;
 const WAITING_FOR_DEBUGGER = /Waiting for debugger on/;
 const MAX_PENDING_CHARS = 64 * 1024;
@@ -136,6 +137,7 @@ interface CaptureSession {
   bytes: number;
   pending: string;
   lines: string[];
+  keptChars: number;
   lineCount: number;
   replayBytes: number;
   waiters: Set<Waiter>;
@@ -203,7 +205,9 @@ function lineMatches(line: string, regex: RegExp, predicate?: WaitPredicate): bo
 function onLine(s: CaptureSession, line: string): void {
   s.lineCount++;
   s.lines.push(line);
-  if (s.lines.length > MAX_KEPT_LINES) s.lines.shift();
+  s.keptChars += line.length;
+  // Kept for sinceCaptureStart matching: bounded by count and by total size.
+  while (s.lines.length > MAX_KEPT_LINES || (s.keptChars > MAX_KEPT_CHARS && s.lines.length > 1)) s.keptChars -= s.lines.shift()!.length;
 
   for (const w of s.waiters) {
     if (lineMatches(line, w.regex, w.predicate)) {
@@ -261,6 +265,7 @@ export async function captureStart(options: CaptureStartOptions = {}): Promise<{
       bytes: 0,
       pending: '',
       lines: [],
+      keptChars: 0,
       lineCount: 0,
       replayBytes: 0,
       waiters: new Set(),

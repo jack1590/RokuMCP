@@ -533,3 +533,24 @@ test('review fixes 9: plain hosts only, bounded RTA frames and console lines', {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('review fixes 10: host check is linear, waits are limited per run, kept console lines are bounded in size', { skip, timeout: 60_000 }, async () => {
+  let t = Date.now();
+  let r = await run(`const t = async (f) => { try { return await f(); } catch (e) { return e.code; } };
+    const bad = await t(() => roku.device.info({ host: ':'.repeat(100000) + '!' }));
+    const good = [];
+    for (const host of ['192.168.1.20', 'roku-living.local', '[fe80::1]']) good.push(await t(() => roku.input.keypress({ host, key: 'Up' })));
+    return { bad, good };`);
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  assert.equal((r.result as { bad: string }).bad, 'bad_args');
+  for (const g of (r.result as { good: unknown[] }).good) assert.notEqual(g, 'bad_args', 'a normal host was refused');
+  assert.ok(Date.now() - t < 20_000);
+
+  // One run leaving 8 long waits behind does not block the next run's waits.
+  r = await run(`for (let i = 0; i < 8; i++) roku.device.sleep({ durationMs: 30000 }); const e = await roku.device.sleep({ durationMs: 1 }).catch((x) => x.code); return e;`);
+  assert.equal(r.result, 'too_many_waits');
+  t = Date.now();
+  r = await run(`return await roku.device.sleep({ durationMs: 10 })`, { timeoutMs: 5000 });
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  assert.ok(Date.now() - t < 3000);
+});
