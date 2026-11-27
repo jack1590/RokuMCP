@@ -42,7 +42,7 @@ rokuctl ui.focused
 | Symptom | Cause | Fix |
 |---|---|---|
 | "No dev channel is running (the device answered 404 to query/app-ui)" | The UI tree needs a sideloaded dev channel | Deploy it (`deploy-debug` skill) |
-| 403 "Limited mode" on a Cloud Device | RCE snapshot in Limited ECP mode | Tell the user to switch the snapshot to Permissive (`rce-cloud-emulator` skill); keys still work |
+| "the device refused ECP ... Limited" (403) on a Cloud Device | RCE snapshot in Limited ECP mode | Tell the user to switch the snapshot to Permissive (`rce-cloud-emulator` skill); keys still work |
 | The find returns nothing right after a key | The UI had not settled | Sleep longer, then find again |
 | Typed text went nowhere | The field did not have focus | Select the field first, then type |
 | "Could not resolve the Roku device hostname" or "No Roku device found" | No host, no Cloud Device, SSDP found nothing | Ask the user for the device; do not invent an IP (`install` skill) |

@@ -22,7 +22,7 @@ const diff = await roku.profile.compare({ beforePath: 'profiles/before.bsprof', 
 return { leaks: summary.report.topMemoryLeaks, diff: diff.diff };
 ```
 
-Paths must be inside the server's working directory.
+Paths must be inside the server's working directory: save the downloaded `.bsprof` in the project folder first.
 
 ### From a shell (`rokuctl`)
 
@@ -38,4 +38,5 @@ rokuctl profile.compare before.bsprof after.bsprof --out diff.json
 | The first analysis takes minutes | Large file (tens of millions of entries) | Expected once; the parse is cached for the next call on the same file |
 | Empty or tiny report | Profiling was not enabled for that run | Check `bs_prof_enabled=true`, redeploy, reproduce again |
 | `rokuctl` exit 2 `output_too_large` | A full report is over 64 KiB | Add `--out <file>` |
-| ENOENT | Wrong path | Use an absolute path, or one inside the working directory for `roku_run` |
+| ENOENT | Wrong path | Check the path. Tools and `rokuctl` take any path |
+| `path_denied` in `roku_run` | The file is outside the working directory | Save the downloaded `.bsprof` inside the project folder, then pass that path |

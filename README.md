@@ -213,6 +213,64 @@ roku_get_value, then change it back.
 
 The agent will `roku_query_app_ui` to locate the node, grab the `uiElementId`, call `roku_edit_node` + `roku_get_value`, and roll back — proving end-to-end RTA wiring.
 
+## Code mode
+
+Full mode (the default) exposes 46 tools, and each step of a flow (press, wait, check) is one tool call. Code mode exposes three tools and lets the agent write the whole flow as one short script:
+
+| Tool | Purpose |
+|---|---|
+| `roku_run` | Runs a JavaScript async function body against the roku-mcp SDK and returns its result, logs and the files it wrote |
+| `roku_sdk_docs` | Lists the calls a script can make; with a query, their full option schemas |
+| `roku_screenshot` | The screenshot tool, since a script cannot return an image |
+
+Turn it on with `ROKU_MCP_MODE=code` (also a plugin setting). It needs Node.js 22.13 or later; on older Node, `roku_run` refuses and says why.
+
+```js
+// roku_run code:
+await roku.input.keys({ keys: ['Home', 'Down', 'Select'], delayMs: 300 });
+await roku.device.sleep({ durationMs: 1500 });
+return { focused: await roku.ui.focused(), player: await roku.device.mediaPlayer() };
+```
+
+Calls are `roku.<group>.<call>(options)`, one per SDK operation (`device`, `input`, `ui`, `app`, `console`, `rta`, `profile`, `perfetto`, `stream`, `rce`), with the same options as the matching tool. A failed call throws an error with `code` and `message`. Console sessions, captures and Perfetto recordings persist between `roku_run` calls.
+
+The main saving is the tool list itself: on the fake devices in the test suite (`npm run bench`), it shrinks from about 12,000 to about 1,000 tokens, every session. The three measured flows also take one call instead of 3, 12 and 4, while each call's own bytes change little (results in [`bench/results.json`](./bench/results.json)). Tokens are estimated as bytes / 4. The bench does not measure model reasoning per round trip, the earlier results a model re-reads each turn, or the cost of writing the script, so the real saving per flow depends on the agent.
+
+### What a script can and cannot do
+
+The script runs in a separate Node.js process started with the [permission model](https://nodejs.org/api/permissions.html) and no grants: no file system, no child processes, no workers, no native addons, no inspector, and an empty environment. Before the script runs, `process.kill` and the other signal functions are removed, `node:sqlite` is disabled, and the process refuses to run if either is still reachable. Every `roku.*` call goes to the server, which checks it against the command list and the tool's input schema before running it. Secrets (`ROKU_RCE_TOKEN`, passwords) stay in the server, and errors come back as `code` and `message`, with secrets removed and no stack trace.
+
+- **Files:** `roku.fs.read(path)` and `roku.fs.list(path)` read inside the server's working directory. `roku.fs.write(path, text)` creates data files only (`.json`, `.txt`, `.log`, `.csv`, `.md`, `.png`, `.trace`, ...) and only inside `roku-run/`. Console captures, screenshots and traces given a folder go there too. Paths that leave the working directory, follow a symlink out of it, or name secret files are refused: `.env*`, `*.env`, `.npmrc`, `.git-credentials`, `mcp.json`, `opencode.json`, `bsconfig*.json`, `rokudeploy*.json`, key files, and folders such as `.git`, `.ssh`, `.vscode`, `.cursor` and `.claude`.
+- **Deploy:** `rootDir` must hold no secret file and no symlink. `files` and `stagingDir` cannot be set from a script.
+- **Perfetto SQL:** `roku.perfetto.query` takes one read-only `SELECT` or `WITH` statement, because `trace_processor` runs with the server's rights.
+- **Limits:** 30 s by default (`timeoutMs`, at most 300 s), a 128 MB JavaScript heap, a 100 KiB return value, 64 KiB of logs, and 5,000 calls per run.
+- **Known limits:**
+  - **Network:** the script can open network connections (Node 22 does not restrict them). It holds no secrets, but it can reach local services.
+  - **Memory:** the heap limit does not count `ArrayBuffer` memory, so a script can allocate large buffers until its timeout.
+  - **Calls in progress:** a device call already in progress when the run times out still finishes.
+  - **Device hosts:** as with the tools, a deploy to a host the script names uses the configured password.
+  - **Windows:** not tested yet.
+
+## Command line (rokuctl)
+
+`rokuctl` runs the same SDK operations from a shell or CI, one command per call:
+
+```sh
+npx -p roku-mcp rokuctl help
+rokuctl app.deploy ./dist --rce-device 400
+rokuctl console.capture "HomeScreen ready" --timeout-ms 60000 --settle-ms 0
+rokuctl input.keys Down Select --delay-ms 400
+rokuctl ui.app-ui --out ui.xml
+```
+
+- **Output:** exactly one JSON object on stdout, `{"ok":true,"data":...}` or `{"ok":false,"error":{"code":"...","message":"..."}}`.
+- **Exit codes:** 0 ok, 1 device or tool error, 2 usage error, 3 timeout.
+- **Large output:** screenshots and results over 64 KiB are written only to `--out <file>`.
+- **Options:** kebab-case (`--rce-device`, `--delay-ms`), or one `--json '{...}'` object. `--timeout <ms>` bounds the whole command.
+- **Passwords:** come from the environment or `.env`; a password flag is refused.
+- **Session commands:** the single-shot console, step-by-step capture and Perfetto recording keep state between calls, so they exist only in code mode. `console.capture` covers capture, wait and stop in one command.
+- **Cloud Device Runs:** an interrupted `rokuctl rce.start` (Ctrl-C or `--timeout`) stops the Run it started. A finished `rce.start` leaves the Run up on purpose: stop it with `rokuctl rce.stop <device>`.
+
 ## Environment Variables
 
 | Variable | Aliases (checked in order, canonical first) | Description |
@@ -223,6 +281,7 @@ The agent will `roku_query_app_ui` to locate the node, grab the `uiElementId`, c
 | `ROKU_RCE_DEVICE` | none | Default RCE Cloud Device, by id or exact name |
 | `ROKU_RCE_PASSWORD` | none | Developer password of the RCE Cloud Device |
 | `ROKU_MCP_ENV_FILE` | none | Absolute path to an extra `.env` file to load (see below) |
+| `ROKU_MCP_MODE` | none | `code` for [code mode](#code-mode); anything else, or unset, is the full tool set |
 
 Device-facing tools accept a `host` parameter and an `rceDevice` parameter, which override the environment variables. `roku_deploy`, `roku_delete_dev_channel`, `roku_screenshot` and `roku_diagnose_stream` (for `captureLive`) also accept `password`. The target is chosen in this order: the `host` parameter, then the `rceDevice` parameter, then `ROKU_RCE_DEVICE`, then `ROKU_DEVICE_HOST` (or its aliases, including values from `.env`), then SSDP discovery.
 
@@ -452,7 +511,7 @@ HAR exports from an HTTP proxy such as [roxy](https://github.com/oscarsanchez/ro
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 18+ (22.13+ for code mode: its sandbox uses the stable permission model)
 - A Roku device with [Developer Mode](https://developer.roku.com/docs/developer-program/getting-started/developer-setup.md) enabled on the same network, or a Roku Cloud Emulator account (`ROKU_RCE_TOKEN`) with a Cloud Device
 - For screenshots and deploy: a sideloaded dev channel must be running
 

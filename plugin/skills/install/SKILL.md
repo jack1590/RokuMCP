@@ -14,10 +14,10 @@ description: Install and configure roku-mcp (Claude Code or Cursor plugin, or th
    /plugin install roku-mcp@roku-mcp-marketplace
    ```
 
-   Run `/reload-plugins`; the server is registered as `roku`. Cursor: add the repo as a plugin marketplace (`.cursor-plugin/marketplace.json`). The plugin starts `npx -y roku-mcp@<version>`, pinned to the plugin's release (first launch downloads it; needs Node 18+, and 22.13+ for code mode).
+   Run `/reload-plugins`; the server is registered as `roku`. Cursor: add the repo as a plugin marketplace (`.cursor-plugin/marketplace.json`). The plugin starts `npx -y roku-mcp@<version>`, pinned to the plugin's release (the first launch downloads it). Code mode needs Node.js 22.13 or later.
 2. Give it a device. The target is chosen in this order: the `host` parameter, the `rceDevice` parameter, `ROKU_RCE_DEVICE`, `ROKU_DEVICE_HOST` (aliases `ROKU_IP`, `ROKU_HOST`, `ROKU_DEV_TARGET`, also read from a project `.env`), then SSDP discovery on the LAN.
 3. Give it the password in the environment or `.env`: `ROKU_DEVICE_PASSWORD` (aliases `ROKU_DEV_PASSWORD`, `ROKU_PASSWORD`); for a Cloud Device `ROKU_RCE_PASSWORD`, plus `ROKU_RCE_TOKEN` (see `rce-cloud-emulator`). A LAN device never reads `ROKU_RCE_PASSWORD`.
-4. Choose the mode. Full mode (default) offers every tool. Code mode, `ROKU_MCP_MODE=code`, offers `roku_run`, `roku_sdk_docs` and `roku_screenshot`: fewer tool definitions in context and one call per multi-step flow.
+4. Choose the mode (1.10.0 and later). Full mode (default) offers every tool. Code mode, `ROKU_MCP_MODE=code` (the plugin's "Server mode" setting, or the server environment), offers `roku_run`, `roku_sdk_docs` and `roku_screenshot`: fewer tool definitions in context and one call per multi-step flow.
 5. Verify: `roku_query_device_info` (ECP on 8060 answers) and `roku_query_active_app`. In code mode: `roku_run` with `return await roku.device.info()`.
 6. Shell or CI: `npx -p roku-mcp rokuctl help` lists the commands; each prints one JSON object.
 

@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "Marketplace for the roku-mcp plugin (Roku MCP server plus workflow skills).",
-    "version": "1.9.0"
+    "version": "1.10.0"
   },
   "plugins": [
     {
       "name": "roku-mcp",
       "source": "./plugin",
       "description": "Roku app automation, profiling, and stream diagnosis for LAN dev devices and Roku Cloud Emulator.",
-      "version": "1.9.0",
+      "version": "1.10.0",
       "category": "tools",
       "tags": [
         "roku",

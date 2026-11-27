@@ -1,6 +1,6 @@
 {
   "name": "roku-mcp",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "MCP server for Roku device automation on LAN devices and Roku Cloud Emulator (RCE): deploy, ECP control, screenshots, debug console, runtime UI editing, BrightScript and Perfetto profiling, and stream diagnosis",
   "type": "module",
   "main": "dist/index.js",

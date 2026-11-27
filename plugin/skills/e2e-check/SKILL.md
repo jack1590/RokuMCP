@@ -19,7 +19,13 @@ The whole check is one call; it fails with the first error's `code` and `message
 
 ```js
 const steps = [];
-const check = (name, ok, detail) => { steps.push({ name, ok, detail }); if (!ok) throw Object.assign(new Error(name), { code: 'check_failed' }); };
+const check = (name, ok, detail) => {
+  steps.push({ name, ok, detail });
+  if (!ok) {
+    console.log(JSON.stringify(steps)); // logs survive the throw
+    throw Object.assign(new Error(name), { code: 'check_failed' });
+  }
+};
 await roku.device.launch({ appId: 'dev', restart: true });
 await roku.device.sleep({ durationMs: 4000 });
 check('home visible', (await roku.ui.find({ nodeId: 'homeScreen' })).length > 0);
@@ -34,8 +40,10 @@ return steps;
 
 ```sh
 set -e
-rokuctl app.deploy ./dist --rce-device "$ROKU_RCE_DEVICE"
-rokuctl console.capture "HomeScreen ready" --timeout-ms 60000 --settle-ms 0
+rokuctl console.capture "HomeScreen ready" --timeout-ms 90000 --settle-ms 0 > capture.json &
+sleep 2
+rokuctl app.deploy ./dist
+wait $!  # exit 3 if the line never appeared
 rokuctl input.keys Down Select --delay-ms 400
 rokuctl device.sleep 3000
 rokuctl device.media-player | jq -e '.data.player["@_state"] == "play"'

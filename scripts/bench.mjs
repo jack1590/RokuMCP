@@ -38,7 +38,11 @@ process.chdir(work);
 const T = { rceDevice: '400' };
 const SETTLE = 100; // ms; real flows use 500-2000, kept short so the bench is quick
 
-/** Each flow as the tool calls a full-mode agent makes, and as one roku_run snippet. */
+/**
+ * Each flow as the tool calls a full-mode agent makes, and as one roku_run snippet. Full mode uses
+ * one roku_keypress per key with a sleep between (the skills' loop); roku_keypress_sequence would
+ * cut the navigate flow to fewer calls. Neither mode takes screenshots.
+ */
 const FLOWS = [
   {
     name: 'deploy, then verify a label',
@@ -100,32 +104,45 @@ async function runFlow(client, calls, emit) {
   const started = Date.now();
   const timer = emit ? setInterval(() => world.consoleEmit('HomeScreen ready\n'), 50) : undefined;
   let errors = 0;
-  for (const [name, args] of calls) {
-    const request = { name, arguments: args };
-    const result = await client.callTool(request, undefined, { timeout: 60_000 });
-    sent += bytes(request);
-    received += bytes(result);
-    if (result.isError) errors++;
+  try {
+    for (const [name, args] of calls) {
+      const request = { name, arguments: args };
+      const result = await client.callTool(request, undefined, { timeout: 60_000 });
+      sent += bytes(request);
+      received += bytes(result);
+      if (result.isError) errors++;
+    }
+  } finally {
+    clearInterval(timer);
   }
-  clearInterval(timer);
   return { calls: calls.length, requestBytes: sent, responseBytes: received, contextTokens: tokens(sent + received), wallMs: Date.now() - started, errors };
 }
 
-const results = { date: new Date().toISOString(), node: process.version, settleMs: SETTLE, modes: {}, flows: [] };
+const results = {
+  date: new Date().toISOString(),
+  node: process.version,
+  settleMs: SETTLE,
+  tokenEstimate: 'bytes / 4. Counts tool definitions and request/response bytes only: not model reasoning per round trip, the earlier results a model re-reads each turn, writing the snippet, roku_sdk_docs lookups, or retries.',
+  modes: {},
+  flows: [],
+};
 const clients = { full: await connect('full'), code: await connect('code') };
-for (const mode of ['full', 'code']) {
-  const { tools } = await clients[mode].listTools();
-  results.modes[mode] = { tools: tools.length, toolsListBytes: bytes(tools), toolsListTokens: tokens(bytes(tools)) };
+try {
+  for (const mode of ['full', 'code']) {
+    const { tools } = await clients[mode].listTools();
+    results.modes[mode] = { tools: tools.length, toolsListBytes: bytes(tools), toolsListTokens: tokens(bytes(tools)) };
+  }
+  for (const flow of FLOWS) {
+    const full = await runFlow(clients.full, flow.full, flow.emit);
+    const code = await runFlow(clients.code, [['roku_run', { ...T, code: flow.code, timeoutMs: 60_000 }]], flow.emit);
+    results.flows.push({ name: flow.name, full, code });
+  }
+} finally {
+  await clients.full.close();
+  await clients.code.close();
+  process.chdir(repo);
+  fs.rmSync(work, { recursive: true, force: true });
 }
-for (const flow of FLOWS) {
-  const full = await runFlow(clients.full, flow.full, flow.emit);
-  const code = await runFlow(clients.code, [['roku_run', { ...T, code: flow.code, timeoutMs: 60_000 }]], flow.emit);
-  results.flows.push({ name: flow.name, full, code });
-}
-await clients.full.close();
-await clients.code.close();
-process.chdir(repo);
-fs.rmSync(work, { recursive: true, force: true });
 
 fs.mkdirSync(path.join(repo, 'bench'), { recursive: true });
 fs.writeFileSync(path.join(repo, 'bench', 'results.json'), JSON.stringify(results, null, 2) + '\n');

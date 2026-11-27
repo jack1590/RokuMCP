@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "roku-mcp@1.9.0"
+        "roku-mcp@1.10.0"
       ]
     }
   }

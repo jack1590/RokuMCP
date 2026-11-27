@@ -29,6 +29,7 @@ Whatever name the user gave this MCP server in their client config (typically `r
 | Perfetto tracing (Roku OS 15.1+) | `roku_perfetto_enable`, `roku_perfetto_start`, `roku_perfetto_stop`, `analyze_perfetto`, `compare_perfetto`, `query_perfetto` |
 | Stream diagnosis | `roku_diagnose_stream` |
 | Roku Cloud Emulator (billed) | `roku_rce_list_devices`, `roku_rce_start`, `roku_rce_stop`, `roku_rce_status` |
+| Code mode only | `roku_run`, `roku_sdk_docs` (plus `roku_screenshot`) |
 
 ## Stream diagnosis (`roku_diagnose_stream`)
 
@@ -78,6 +79,24 @@ What to expect on a Cloud Device:
 - The runtime UI editing tools try an RCE bridge to port 9000. This path is unverified; a closed-port error means the channel has no RTA or RCE does not bridge port 9000.
 - `roku_perfetto_enable`, `roku_perfetto_start`, `roku_discover` and `roku_diagnose_stream` with `captureLive` are not supported and say so.
 - Never create or delete Cloud Devices; no tool does that.
+
+## Code mode (`ROKU_MCP_MODE=code`)
+
+When your tool list has `roku_run`, `roku_sdk_docs` and `roku_screenshot` instead of the full set, the server is in code mode. Write each multi-step flow as one `roku_run` snippet: the body of an async function with `roku` and `console` in scope that `return`s a JSON value.
+
+```js
+await roku.input.keys({ keys: ['Home', 'Down', 'Select'], delayMs: 300 });
+await roku.device.sleep({ durationMs: 1500 });
+return { focused: await roku.ui.focused(), found: (await roku.ui.find({ attr: 'text', value: 'Play' })).length };
+```
+
+- Calls are `roku.<group>.<call>(options)`, with the same options as the matching tool. Look them up with `roku_sdk_docs` (no query: the list; with a query: option schemas). Groups: `device`, `input`, `ui`, `app`, `console`, `rta`, `profile`, `perfetto`, `stream`, `rce`, plus `roku.fs.read`, `roku.fs.write` and `roku.fs.list`.
+- Pass `host` or `rceDevice` to `roku_run` to target every call; the usual environment and discovery apply otherwise.
+- A failed call throws an Error with `code` and `message`: catch it to recover, or let it end the run (`ok: false`). Stop Cloud Device Runs and console captures in `finally`.
+- Paths stay inside the server's working directory; secret files (`.env`, `mcp.json`, `bsconfig.json`, keys) are refused. Writes create data files only, under `roku-run/`. Deploy a build folder (no `files`, no `stagingDir`). `roku.perfetto.query` takes one read-only `SELECT`.
+- Limits: 30 s by default (`timeoutMs` up to 300000), 100 KiB return value, 64 KiB logs. Return a summary, or write big results with `roku.fs.write` and return the path.
+- Take images with `roku_screenshot`; a script cannot return an image.
+- Without MCP, `rokuctl <group>.<command>` runs one call from a shell (one JSON object on stdout; exit 0/1/2/3). See `rokuctl help`.
 
 ## The canonical loop
 

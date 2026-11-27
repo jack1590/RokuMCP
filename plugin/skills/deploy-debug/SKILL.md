@@ -17,10 +17,14 @@ description: Sideload a Roku channel, redeploy after a change, and read what the
 ### In code mode (`roku_run`)
 
 ```js
-const cap = await roku.console.captureStart({ settleMs: 0 });
-await roku.app.deploy({ rootDir: 'dist' });
-const line = await roku.console.wait({ pattern: 'HomeScreen ready', timeoutMs: 60000 });
-const summary = await roku.console.captureStop();
+await roku.console.captureStart({ settleMs: 0 });
+let line, summary;
+try {
+  await roku.app.deploy({ rootDir: 'dist' });
+  line = await roku.console.wait({ pattern: 'HomeScreen ready', timeoutMs: 60000 });
+} finally {
+  summary = await roku.console.captureStop(); // a failed wait must not leave the capture holding port 8085
+}
 return { line, file: summary.file };
 ```
 
@@ -28,9 +32,13 @@ Captures from `roku_run` are written under `roku-run/`. A deploy from `roku_run`
 
 ### From a shell (`rokuctl`)
 
+Each `rokuctl` command is its own process, so start the capture in the background, then deploy, then wait for it:
+
 ```sh
+rokuctl console.capture "HomeScreen ready" --timeout-ms 90000 --settle-ms 0 --file logs/startup.log > capture.json &
+sleep 2
 rokuctl app.deploy ./dist
-rokuctl console.capture "HomeScreen ready" --timeout-ms 60000 --settle-ms 0 --file logs/startup.log
+wait $! && cat capture.json
 ```
 
 ## When it goes wrong

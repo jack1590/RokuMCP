@@ -41,3 +41,4 @@ In `roku_run`, `outDir` is under `roku-run/`. Recording keeps state between call
 | "not supported on Roku Cloud Emulator devices" | Perfetto needs direct LAN access | Use a LAN device, or `bsprof-profiling` |
 | "No active Perfetto recording" | Stop without start, or the server restarted | Start again |
 | First analysis is slow | `trace_processor` downloads on first use | Expected once |
+| `roku_run` error `output_too_large` | The report is over 100 KiB | Lower `top`, or `roku.fs.write('trace-report.json', JSON.stringify(report))` and return the path |

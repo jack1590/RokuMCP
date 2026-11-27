@@ -4,14 +4,15 @@
       "command": "npx",
       "args": [
         "-y",
-        "roku-mcp@1.9.0"
+        "roku-mcp@1.10.0"
       ],
       "env": {
         "ROKU_DEVICE_HOST": "${user_config.ROKU_DEVICE_HOST}",
         "ROKU_DEVICE_PASSWORD": "${user_config.ROKU_DEVICE_PASSWORD}",
         "ROKU_RCE_TOKEN": "${user_config.ROKU_RCE_TOKEN}",
         "ROKU_RCE_DEVICE": "${user_config.ROKU_RCE_DEVICE}",
-        "ROKU_RCE_PASSWORD": "${user_config.ROKU_RCE_PASSWORD}"
+        "ROKU_RCE_PASSWORD": "${user_config.ROKU_RCE_PASSWORD}",
+        "ROKU_MCP_MODE": "${user_config.ROKU_MCP_MODE}"
       }
     }
   }

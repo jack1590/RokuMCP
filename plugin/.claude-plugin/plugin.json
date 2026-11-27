@@ -1,7 +1,7 @@
 {
   "name": "roku-mcp",
   "description": "Unofficial. Roku device automation for Claude Code on LAN dev devices and Roku Cloud Emulator (RCE) Cloud Devices: sideload deploy, ECP remote control, screenshots, debug console, runtime SceneGraph UI editing, BrightScript and Perfetto profiling, and stream failure diagnosis. Not affiliated with or endorsed by Roku, Inc.",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "author": {
     "name": "jack1590"
   },
@@ -38,6 +38,12 @@
       "title": "RCE Cloud Device developer password",
       "description": "Optional. Developer password of the Cloud Device (used for deploy, delete and screenshot).",
       "sensitive": true
+    },
+    "ROKU_MCP_MODE": {
+      "type": "string",
+      "title": "Server mode",
+      "description": "Optional. \"code\" for code mode (roku_run, roku_sdk_docs, roku_screenshot; needs Node.js 22.13+). Leave empty for the full tool set.",
+      "sensitive": false
     }
   },
   "privacyPolicyUrl": "https://github.com/jack1590/RokuMCP#privacy"
