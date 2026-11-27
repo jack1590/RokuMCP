@@ -6,7 +6,8 @@
   "main": "dist/index.js",
   "module": "src/index.ts",
   "bin": {
-    "roku-mcp": "dist/index.js"
+    "roku-mcp": "dist/index.js",
+    "rokuctl": "dist/cli.js"
   },
   "files": [
     "dist",

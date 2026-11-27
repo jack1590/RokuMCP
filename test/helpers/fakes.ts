@@ -41,6 +41,8 @@ export class FakeWorld {
   calls: string[] = [];
   /** ECP path (no query string) -> HTTP status to answer instead of 200. */
   ecpStatus: Record<string, number> = {};
+  /** ECP path (no query string) -> body to answer instead of the fixture. */
+  ecpBody: Record<string, string> = {};
   /** When false, the RTA fake drops every connection. */
   rtaUp = true;
   /** RTA request types the fake never answers (to exercise timeouts). */
@@ -65,6 +67,7 @@ export class FakeWorld {
     this.log(`ecp ${method} ${p}`);
     const bare = p.split('?')[0];
     if (this.ecpStatus[bare]) return { status: this.ecpStatus[bare], body: '' };
+    if (this.ecpBody[bare] !== undefined) return { status: 200, body: this.ecpBody[bare] };
     if (method === 'POST') return { status: 200, body: ECP_BODIES[bare] ?? '' };
     return ECP_BODIES[bare] !== undefined ? { status: 200, body: ECP_BODIES[bare] } : { status: 404, body: '' };
   }
