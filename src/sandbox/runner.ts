@@ -34,6 +34,17 @@ const send = (message: unknown) => (process as unknown as { send(m: unknown): vo
 function harden(): string | undefined {
   const p = process as unknown as Record<string, unknown>;
   for (const k of ['kill', '_kill', '_debugProcess', '_debugEnd']) delete p[k];
+  // Other processes' priority, and trace files written outside the grants.
+  const os = process.getBuiltinModule('node:os') as Record<string, unknown>;
+  os.setPriority = () => {
+    throw Object.assign(new Error('os.setPriority is disabled in roku_run'), { code: 'ERR_ACCESS_DENIED' });
+  };
+  const traceEvents = process.getBuiltinModule('node:trace_events') as Record<string, unknown>;
+  traceEvents.createTracing = () => {
+    throw Object.assign(new Error('trace_events is disabled in roku_run'), { code: 'ERR_ACCESS_DENIED' });
+  };
+  // Make `import { setPriority } from 'node:os'` see the stubs too.
+  (process.getBuiltinModule('node:module') as { syncBuiltinESMExports(): void }).syncBuiltinESMExports();
   const left = ['kill', '_kill', '_debugProcess', '_debugEnd'].filter((k) => typeof p[k] === 'function');
   if (left.length) return `process.${left.join(', process.')} is still available`;
   if (process.getBuiltinModule('node:sqlite') !== undefined) return 'node:sqlite is available';

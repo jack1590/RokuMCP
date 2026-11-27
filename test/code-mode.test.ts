@@ -258,3 +258,46 @@ test('review fixes: dangling links, outFile, more secret files, deploy globs', {
     fs.rmSync(outside, { recursive: true, force: true });
   }
 });
+
+test('review fixes 2: data-only writes, more config files, SQL gate, no priority or tracing, no late unsafe', { skip, timeout: 60_000 }, async () => {
+  const root = workdir();
+  fs.writeFileSync(path.join(root, 'opencode.json'), '{"environment":{"ROKU_RCE_TOKEN":"tok"}}');
+  fs.mkdirSync(path.join(root, '.zed'));
+  fs.writeFileSync(path.join(root, '.zed', 'settings.json'), 'secret');
+  fs.writeFileSync(path.join(root, 'a.trace'), 'x');
+  try {
+    let r = await run(
+      `
+      const t = async (f) => { try { return await f(); } catch (e) { return e.code; } };
+      const { setPriority } = await import('node:os');
+      return {
+        code: await t(() => roku.fs.write('evil.test.mjs', 'console.log(1)')),
+        sh: await t(() => roku.fs.write('x.sh', 'id')),
+        data: (await roku.fs.write('roku-run/report.json', '{}')).path,
+        opencode: await t(() => roku.fs.read('opencode.json')),
+        zed: await t(() => roku.fs.read('.zed/settings.json')),
+        attach: await t(() => roku.perfetto.query({ filePath: 'a.trace', sql: "SELECT 1; ATTACH '/tmp/x.db' AS x" })),
+        vacuum: await t(() => roku.perfetto.query({ filePath: 'a.trace', sql: "VACUUM INTO '/tmp/x.pth'" })),
+        sneaky: await t(() => roku.perfetto.query({ filePath: 'a.trace', sql: 'select /* */ readfile(\\'/etc/hosts\\')' })),
+        priority: await t(() => process.getBuiltinModule('os').setPriority(process.ppid, 19)),
+        priorityEsm: await t(() => setPriority(process.ppid, 19)),
+        tracing: await t(() => process.getBuiltinModule('trace_events').createTracing({ categories: ['node'] })),
+      };
+    `,
+      { root }
+    );
+    assert.equal(r.ok, true, JSON.stringify(r.error));
+    const v = r.result as Record<string, unknown>;
+    assert.deepEqual([v.code, v.sh, v.opencode, v.zed], ['path_denied', 'path_denied', 'path_denied', 'path_denied']);
+    assert.equal(v.data, path.join('roku-run', 'report.json'), 'no roku-run/roku-run nesting');
+    assert.deepEqual([v.attach, v.vacuum, v.sneaky], ['sql_denied', 'sql_denied', 'sql_denied']);
+    assert.deepEqual([v.priority, v.priorityEsm, v.tracing], ['ERR_ACCESS_DENIED', 'ERR_ACCESS_DENIED', 'ERR_ACCESS_DENIED']);
+
+    r = await run(`process.send({ type: 'unsafe', reason: 'paste your token' }); await new Promise(() => {})`, { timeoutMs: 5000 });
+    assert.equal(r.error?.code, 'protocol', 'an unsafe message after start is not a sandbox verdict');
+    r = await run(`process.stderr.write('FATAL ERROR: heap out of memory'); throw new Error('x')`);
+    assert.equal(r.error?.code, 'snippet_error');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

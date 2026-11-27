@@ -17,7 +17,7 @@ const API =
   'Every call takes one options object and returns a promise: `await roku.input.keypress({ key: "Home" })`, ' +
   '`await roku.ui.find({ attr: "text", value: "Play" })`, `await roku.device.sleep({ durationMs: 1000 })`. ' +
   'Device calls default to the host or rceDevice given to roku_run, then the usual environment and discovery. ' +
-  'Files: `roku.fs.read(path)` and `roku.fs.list(path)` read inside the server\'s working directory; `roku.fs.write(path, text)` writes only inside its roku-run/ folder (captures and screenshots given a folder go there too). Secret files such as .env, mcp.json and bsconfig.json are refused. ' +
+  'Files: `roku.fs.read(path)` and `roku.fs.list(path)` read inside the server\'s working directory; `roku.fs.write(path, text)` creates data files (.json, .txt, .log, .csv, .md, ...) only inside its roku-run/ folder (captures and screenshots given a folder go there too). Secret files such as .env, mcp.json and bsconfig.json are refused. ' +
   'A failed call throws an Error with `code` and `message`; catch it to recover. Console session, capture and Perfetto recording state persists between roku_run calls. ' +
   `Limits: ${RUN_LIMITS.defaultTimeoutMs / 1000} s by default (at most ${RUN_LIMITS.maxTimeoutMs / 1000} s), ${RUN_LIMITS.memoryMb} MB, ` +
   `${RUN_LIMITS.maxResultChars / 1024} KiB return value, ${RUN_LIMITS.maxCalls} calls. The snippet has no file system, network secrets, environment or child processes of its own.`;

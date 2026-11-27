@@ -62,9 +62,21 @@ const BY_CALL = new Map<string, Command>(COMMANDS.map((c) => {
 /** Every call name a snippet may use, for the docs tool. */
 export const CALL_NAMES = [...BY_CALL.keys(), 'fs.read', 'fs.write', 'fs.list'];
 
-/** Options the SDK reads from, and options it writes to (those must be in the output folder). */
+/** Options the SDK reads from (outDir and file, which it writes to, must be in the output folder). */
 const READ_KEYS = ['filePath', 'beforePath', 'afterPath', 'charlesSessionPath'];
-const WRITE_KEYS = ['outDir', 'file'];
+
+/**
+ * trace_processor runs outside the sandbox with the server's rights, and its SQLite can ATTACH,
+ * VACUUM INTO or call file functions. From roku_run, allow one read-only SELECT or WITH statement.
+ */
+function checkReadOnlySql(sql: unknown): void {
+  const text = String(sql);
+  const bare = text.replace(/--[^\n]*|\/\*[\s\S]*?\*\//g, ' ').trim().replace(/;\s*$/, '');
+  const forbidden = /\b(attach|detach|vacuum|pragma|insert|update|delete|replace|create|drop|alter|reindex|load_extension|readfile|writefile|edit|fsdir|zipfile|sqlar)\b/i;
+  if (!/^(select|with)\b/i.test(bare) || bare.includes(';') || forbidden.test(bare)) {
+    throw new RokuError('sql_denied', 'From roku_run, perfetto.query takes one read-only SELECT or WITH statement (no ATTACH, VACUUM, PRAGMA, writes or file functions).');
+  }
+}
 /** Error codes only roku_run itself reports; a snippet cannot claim them. */
 const SANDBOX_CODES = new Set(['timeout', 'memory_limit', 'crashed', 'protocol', 'spawn_failed', 'unsupported_node', 'sandbox_unsafe', 'output_too_large']);
 const MAX_ERROR_CHARS = 2000;
@@ -133,7 +145,9 @@ class Dispatcher {
     if (input.rootDir !== undefined) input.rootDir = this.policy.resolveDeployRoot(input.rootDir);
     if (input.outFile !== undefined) this.policy.checkFileName(input.outFile, 'outFile');
     for (const key of READ_KEYS) if (input[key] !== undefined) input[key] = this.policy.resolveRead(input[key], key);
-    for (const key of WRITE_KEYS) if (input[key] !== undefined) input[key] = this.policy.resolveWrite(input[key], key);
+    if (input.outDir !== undefined) input.outDir = this.policy.resolveWrite(input.outDir, 'outDir');
+    if (input.file !== undefined) input.file = this.policy.resolveWriteFile(input.file, 'file');
+    if (input.sql !== undefined) checkReadOnlySql(input.sql);
   }
 
   /** A capture with no file goes to the output folder, not ./logs. */
@@ -155,10 +169,10 @@ class Dispatcher {
       case 'fs.write': {
         if (typeof content !== 'string') throw new RokuError('bad_args', 'roku.fs.write(path, text) takes a string.');
         if (Buffer.byteLength(content) > RUN_LIMITS.maxWriteBytes) throw new RokuError('too_large', `roku.fs.write writes at most ${RUN_LIMITS.maxWriteBytes} bytes.`);
-        const abs = this.policy.resolveWrite(p);
+        const abs = this.policy.resolveWriteFile(p);
         fs.mkdirSync(path.dirname(abs), { recursive: true });
         // Check again after mkdir, and never follow a link at the final name.
-        this.policy.resolveWrite(abs);
+        this.policy.resolveWriteFile(abs);
         const fd = fs.openSync(abs, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | (fs.constants.O_NOFOLLOW ?? 0));
         try {
           fs.writeSync(fd, content);
@@ -231,9 +245,9 @@ export async function runSnippet(options: RunOptions): Promise<RunResult> {
 
     let started = false;
     child.on('message', (raw: unknown) => {
-      if (settled) return; // nothing runs after the result is decided
+      if (settled) return; // no new call starts after the result is decided (calls already running finish)
       const m = raw as { type?: unknown; id?: unknown; name?: unknown; args?: unknown; value?: unknown; error?: unknown; logs?: unknown; logsTruncated?: unknown; reason?: unknown };
-      if (m?.type === 'unsafe') {
+      if (m?.type === 'unsafe' && !started) {
         return settle({ ok: false, error: { code: 'sandbox_unsafe', message: `roku_run refused to run the snippet: ${String(m.reason).slice(0, 200)}. Use a Node.js release where this is closed.`, sandbox: true }, logs: [] });
       }
       if (m?.type === 'ready' && !started) {
@@ -267,7 +281,8 @@ export async function runSnippet(options: RunOptions): Promise<RunResult> {
 
     child.on('exit', (code, signal) => {
       if (settled) return;
-      const oom = /heap out of memory|Allocation failed/i.test(stderr) || signal === 'SIGABRT' || code === 134;
+      // V8 aborts on heap exhaustion; stderr text alone is not trusted (the snippet can write it).
+      const oom = (signal === 'SIGABRT' || code === 134) && /heap out of memory|Allocation failed/i.test(stderr);
       settle({
         ok: false,
         error: oom

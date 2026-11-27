@@ -8,11 +8,17 @@ import fs from 'fs';
 import path from 'path';
 import { RokuError } from '../sdk/errors.js';
 
-/** File names that usually hold secrets or device passwords. */
+/** File names that usually hold secrets, device passwords or MCP client config with tokens. */
 const SECRET_NAME =
-  /^(\.env(\..*)?|.*\.env|\.envrc|\.npmrc|\.yarnrc(\.yml)?|\.netrc|\.pypirc|\.git-credentials|\.mcpregistry_.*|\.?mcp\.json|bsconfig.*\.json|rokudeploy.*\.json|credentials(\..*)?|secrets?(\..*)?|id_(rsa|dsa|ecdsa|ed25519)(\.pub)?|.*\.(pem|key|p12|pfx|keystore|jks|secret))$/i;
+  /^(\.env(\..*)?|.*\.env|\.envrc|\.npmrc|\.yarnrc(\.yml)?|\.netrc|\.pypirc|\.git-credentials|\.mcpregistry_.*|\.?mcp\.json|opencode\.jsonc?|claude_desktop_config\.json|bsconfig.*\.json|rokudeploy.*\.json|(credentials|secrets?)\.(json|ya?ml|toml|ini|txt|env)|id_(rsa|dsa|ecdsa|ed25519)(\.pub)?|.*\.(pem|key|p12|pfx|keystore|jks|secret))$/i;
 /** Folders that hold credentials or editor and agent configuration. */
-const SECRET_DIR = /^(\.git|\.ssh|\.aws|\.azure|\.gnupg|\.docker|\.kube|\.config|\.claude|\.cursor|\.vscode|\.windsurf|\.idea|\.continue|\.codex|\.gemini)$/i;
+const SECRET_DIR = /^(\.git|\.ssh|\.aws|\.azure|\.gnupg|\.docker|\.kube|\.config|\.claude|\.cursor|\.vscode|\.windsurf|\.zed|\.idea|\.continue|\.codex|\.gemini|\.opencode)$/i;
+
+/**
+ * File types roku_run may create: data only. A .js, .ts, .sh or similar file in roku-run/ would
+ * run later outside the sandbox (test runners pick up *.test.mjs anywhere in the project).
+ */
+const WRITABLE_EXT = /\.(txt|log|json|csv|tsv|md|xml|html|png|jpe?g|trace|bsprof|har|chlsj)$/i;
 
 export const OUTPUT_DIR = 'roku-run';
 
@@ -20,7 +26,8 @@ const denied = (message: string) => new RokuError('path_denied', message);
 
 /** Windows ignores trailing dots and spaces, and "name:stream" is the same file: compare the plain name. */
 const plainName = (seg: string) => (process.platform === 'win32' ? seg.split(':')[0].replace(/[. ]+$/, '') : seg);
-const isSecret = (seg: string) => SECRET_NAME.test(plainName(seg)) || SECRET_DIR.test(plainName(seg));
+// Windows 8.3 short names (ENV~1) would get past the name checks: refuse them.
+const isSecret = (seg: string) => SECRET_NAME.test(plainName(seg)) || SECRET_DIR.test(plainName(seg)) || (process.platform === 'win32' && /~\d/.test(seg));
 
 /** The path with every symlink resolved, dangling ones included; missing tail segments are kept. */
 function resolveLinks(abs: string, hops = 0): string {
@@ -75,11 +82,19 @@ export class PathPolicy {
     return abs;
   }
 
-  /** A path to write: allowed, and inside the output folder (relative paths are taken from it). */
+  /** A folder or file to write: allowed, and inside the output folder (relative paths are taken from it). */
   resolveWrite(p: unknown, what = 'path'): string {
     if (typeof p !== 'string' || p === '') throw denied(`${what} must be a non-empty string`);
-    const abs = this.resolve(path.isAbsolute(p) ? p : path.join(OUTPUT_DIR, p), what);
+    const underOutput = path.isAbsolute(p) || p.split(/[\\/]/)[0] === OUTPUT_DIR ? p : path.join(OUTPUT_DIR, p);
+    const abs = this.resolve(underOutput, what);
     if (!inside(abs, resolveLinks(this.outputDir))) throw denied(`${what} "${p}" is outside the ${OUTPUT_DIR}/ output folder; roku_run writes only there`);
+    return abs;
+  }
+
+  /** A file to create: as resolveWrite, and a data file type. */
+  resolveWriteFile(p: unknown, what = 'path'): string {
+    const abs = this.resolveWrite(p, what);
+    if (!WRITABLE_EXT.test(abs)) throw denied(`${what} "${p}" must be a data file (.txt, .log, .json, .csv, .md, .xml, .html, .png, .jpg, .trace, ...), not code`);
     return abs;
   }
 
