@@ -158,6 +158,12 @@ test('review fixes: typed unions, strict --json, --, no echo, --out folder', asy
 
   r = await cli('device.info', ...RCE, '--out', '/no/such/folder/x.json');
   assert.deepEqual([r.code, r.json.error.code], [2, 'usage']);
+  r = await cli('device.info', ...RCE, '--out', os.tmpdir());
+  assert.deepEqual([r.code, r.json.error.code], [2, 'usage']);
+  r = await cli('device.info', ...RCE, '--constructor', 'x');
+  assert.deepEqual([r.code, r.json.error.code], [2, 'usage']);
+  r = await cli('device.info', '--json', '{"constructor":1}');
+  assert.deepEqual([r.code, r.json.error.code], [2, 'usage']);
 });
 
 test('review fixes: error codes and console.capture misses', async () => {
@@ -184,6 +190,9 @@ test('review fixes: error codes and console.capture misses', async () => {
     const { describeError } = await import('../src/sdk/describe.js');
     const info = describeError(new Error('login failed for sup3r-secret with Bearer abc.def'));
     assert.equal(info.message, 'login failed for <redacted> with Bearer <redacted>');
+    process.env.ROKU_RCE_PASSWORD = 'roku';
+    assert.equal(describeError(new Error('roku_console_wait failed: roku')).message, 'roku_console_wait failed: <redacted>');
+    assert.equal(describeError(new Error('Timed out connecting to RTA on 1.2.3.4')).code, 'timeout');
   } finally {
     delete process.env.ROKU_RCE_PASSWORD;
   }
@@ -193,7 +202,8 @@ test('signals print the JSON line and exit 129/130/143', async () => {
   const bin = path.resolve(here, '..', 'src', 'cli.js');
   for (const [signal, code] of [['SIGHUP', 129], ['SIGINT', 130], ['SIGTERM', 143]] as const) {
     const child = spawnCli(bin, ['device.sleep', '5000']);
-    await new Promise((r) => setTimeout(r, 400));
+    // Wait for the process to start and register its handlers (slow CI included).
+    await new Promise((r) => setTimeout(r, 1500));
     child.proc.kill(signal);
     const { exitCode, stdout } = await child.done;
     assert.equal(exitCode, code, signal);

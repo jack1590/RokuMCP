@@ -35,7 +35,8 @@ const accepts = (field: Field, value: unknown) => !!field && z.safeParse(field, 
 
 /**
  * The JSON reading of a value when the field accepts it as a non-string (so `--match true` is a
- * boolean where the schema allows one), else the raw text. A string "true" for such a field needs --json.
+ * boolean where the schema allows one), else the raw text. A string "true" for such a field needs
+ * --json '{"match":"true"}'.
  */
 function coerce(field: Field, raw: string): unknown {
   if (!field) return raw;
@@ -110,12 +111,12 @@ export function parseArgs(argv: string[]): ParsedArgs {
         throw new UsageError('--json must be a JSON object');
       }
       if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new UsageError('--json must be a JSON object');
-      const unknown = Object.keys(obj).filter((k) => !(k in shape));
+      const unknown = Object.keys(obj).filter((k) => !Object.hasOwn(shape, k));
       if (unknown.length) throw new UsageError(`Unknown option${unknown.length > 1 ? 's' : ''} in --json for ${name}: ${unknown.join(', ')}`);
       Object.assign(input, obj);
     } else if (key === 'password') {
       throw new UsageError('Pass the password through ROKU_DEVICE_PASSWORD or ROKU_RCE_PASSWORD (or .env), not a flag: flags are visible to other processes.');
-    } else if (!(key in shape)) {
+    } else if (!Object.hasOwn(shape, key)) {
       throw new UsageError(`Unknown option --${flag} for ${name}`);
     } else if (eq < 0 && isBooleanField(shape[key]) && !['true', 'false'].includes(rest[i + 1] ?? '')) {
       input[key] = true;
@@ -139,7 +140,11 @@ export function parseArgs(argv: string[]): ParsedArgs {
     throw new UsageError(`Too many arguments for ${name}: expected at most ${slots.length}, got ${positionals.length}.`);
   }
   if ('password' in input) throw new UsageError('Pass the password through the environment or .env, not --json.');
-  if (out && !fs.existsSync(path.dirname(path.resolve(out)))) throw new UsageError(`--out folder does not exist: ${path.dirname(path.resolve(out))}`);
+  if (out) {
+    const dir = path.dirname(path.resolve(out));
+    if (!fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory()) throw new UsageError(`--out folder does not exist: ${dir}`);
+    if (fs.statSync(out, { throwIfNoEntry: false })?.isDirectory()) throw new UsageError(`--out names a folder, not a file: ${out}`);
+  }
   return { command, input, out, timeoutMs };
 }
 
@@ -254,9 +259,21 @@ async function stopRuns(): Promise<string> {
 }
 
 if (isDirectRun) {
+  // Once interrupted, the command's own result must not win the race against the Run cleanup.
+  let interrupted = false;
   for (const signal of Object.keys(SIGNAL_EXIT) as Array<keyof typeof SIGNAL_EXIT>) {
     process.on(signal, () => {
-      void stopRuns().then((note) => finish(SIGNAL_EXIT[signal], jsonify({ ok: false, error: { code: 'interrupted', message: `Interrupted by ${signal}.${note}` } }, 0)));
+      const exitCode = SIGNAL_EXIT[signal];
+      if (interrupted) {
+        const message = `Interrupted again by ${signal} before the cleanup finished. A Cloud Device Run this command started may still be billing: check with "rokuctl rce.status <device>".`;
+        return finish(exitCode, jsonify({ ok: false, error: { code: 'interrupted', message } }, 0));
+      }
+      interrupted = true;
+      const slow = setTimeout(() => process.stderr.write('rokuctl: stopping the Cloud Device Run this command started (up to 20 s). Interrupt again to exit now.\n'), 500);
+      void stopRuns().then((note) => {
+        clearTimeout(slow);
+        finish(exitCode, jsonify({ ok: false, error: { code: 'interrupted', message: `Interrupted by ${signal}.${note}` } }, 0));
+      });
     });
   }
   process.on('uncaughtException', (error) => {
@@ -266,7 +283,11 @@ if (isDirectRun) {
     });
   });
   runCli(process.argv.slice(2)).then(
-    ({ exitCode, stdout }) => finish(exitCode, stdout),
-    (error) => finish(1, jsonify({ ok: false, error: describeError(error) }, 0))
+    ({ exitCode, stdout }) => {
+      if (!interrupted) finish(exitCode, stdout);
+    },
+    (error) => {
+      if (!interrupted) finish(1, jsonify({ ok: false, error: describeError(error) }, 0));
+    }
   );
 }

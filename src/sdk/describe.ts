@@ -20,7 +20,9 @@ export function redactSecrets(text: string, env: NodeJS.ProcessEnv = process.env
   let out = text.replace(/(Bearer\s+)[\w.~+/=-]+/gi, '$1<redacted>').replace(/eyJ[\w-]+\.[\w-]+\.[\w-]*/g, '<jwt>');
   for (const k of SECRET_VARS) {
     const v = env[k];
-    if (v && v.length >= 4) out = out.split(v).join('<redacted>');
+    // Whole-token matches only, so a password like "roku" does not mangle "roku_console_wait".
+    // shortcut: values under 4 characters are not redacted (too many false hits), upgrade if they appear.
+    if (v && v.length >= 4) out = out.replace(new RegExp(`(?<![\\w])${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`, 'g'), '<redacted>');
   }
   return out;
 }
@@ -49,9 +51,11 @@ function classify(error: unknown): string {
   if (axios.isAxiosError(error) && error.response?.status) return `http_${error.response.status}`;
   const errno = errnoOf(error);
   if (errno) return ERRNO[errno] ?? errno.toLowerCase();
-  // Plain errors from the RTA client and the LAN socket connect end with "timed out" or "timed out after <n>ms".
+  if ((error as { code?: unknown } | null)?.code === 'ERR_SOCKET_CONNECTION_TIMEOUT') return 'timeout';
+  // Plain errors from the RTA client, the LAN socket connect and the live capture: "... timed out
+  // [after <n>ms]" or "Timed out ...". Anchored so a file path that contains "timeout" is not one.
   const raw = error instanceof Error ? error.message : String(error);
-  if (/timed out( after \d+ ?ms)?\.?$/.test(raw)) return 'timeout';
+  if (/timed out( after \d+ ?ms)?\.?$|^timed out\b/i.test(raw)) return 'timeout';
   return 'error';
 }
 
